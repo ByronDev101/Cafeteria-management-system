@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="bg-light">
+<main class="container login-wrap">
+    <h1 class="h3 mb-1">Smart Cafeteria</h1>
+    <p class="text-secondary mb-4">Sign in to order from your table.</p>
+
+    <div th:if="${param.error}" class="alert alert-danger" role="alert">
+        Sign-in failed. Check your student number and password, then try again.
+    </div>
+    <div th:if="${param.logout}" class="alert alert-success" role="status">
+        You have signed out.
+    </div>
+
+    <form th:action="@{/login}" method="post" class="card card-body shadow-sm">
+        <div class="mb-3">
+            <label for="username" class="form-label">Student number</label>
+            <input id="username" name="username" type="text" class="form-control"
+                   autocomplete="username" required autofocus>
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input id="password" name="password" type="password" class="form-control"
+                   autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Sign in</button>
+    </form>
+</main>
+</body>
+</html>
