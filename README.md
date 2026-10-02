@@ -5,8 +5,8 @@ Design baseline: SRS-SC-001 and SDS-SC-001.
 
 ## Run locally
 1. Create the database (see `docs/setup.sql`).
-2. Set `DB_USER` and `DB_PASSWORD` (see `.env.example`) in your IDE run configuration or shell.
-3. `mvn spring-boot:run -Dspring-boot.run.profiles=dev`
+2. Set `DB_URL`, `DB_USER` and `DB_PASSWORD` (see `.env.example`). Local MySQL runs on port 3307.
+3. `mvn spring-boot:run "-Dspring-boot.run.profiles=dev"`
 4. Open http://localhost:8080/actuator/health - expect `{"status":"UP"}`.
 5. Open http://localhost:8080/login and sign in with the temporary dev account (dev profile only):
    `dev.student` / `ChangeMe123!` (removed in Sprint 1).
