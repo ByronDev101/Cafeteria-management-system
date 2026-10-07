@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>You can't open this page - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="bg-light">
+<main class="container login-wrap">
+    <h1 class="h3">You can't open this page</h1>
+    <p class="text-secondary">Check the address, or go back and sign in with an account that has access.</p>
+    <a class="btn btn-primary" th:href="@{/}">Back to start</a>
+</main>
+</body>
+</html>

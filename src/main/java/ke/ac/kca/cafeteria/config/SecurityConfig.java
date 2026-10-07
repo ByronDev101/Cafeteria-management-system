@@ -9,10 +9,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Sprint 0 security baseline (SDS section 8).
- * Public: login page, health check, QR resolution route, static assets.
- * Everything else requires authentication. CSRF stays enabled (default).
- * Role-based URL rules are added in Sprint 1 once the identity module exists.
+ * Security rules (SDS section 8). URL rules here are the first layer; services add
+ * ownership checks as features arrive. CSRF stays enabled (default).
  */
 @Configuration
 @EnableWebSecurity
@@ -24,6 +22,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/actuator/health", "/t/**").permitAll()
                 .requestMatchers("/webjars/**", "/css/**", "/js/**", "/error").permitAll()
+                .requestMatchers("/student/**").hasRole("STUDENT")
+                .requestMatchers("/staff/**").hasAnyRole("STAFF", "MANAGER")
+                .requestMatchers("/manager/**").hasRole("MANAGER")
+                .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .formLogin(form -> form
                 .loginPage("/login")

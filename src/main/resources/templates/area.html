@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Smart Cafeteria</title>
+    <title th:text="${area} + ' - Smart Cafeteria'">Area - Smart Cafeteria</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
 <body class="bg-light">
 <main class="container login-wrap">
-    <h1 class="h3">Signed in</h1>
-    <p>Signed in as <strong sec:authentication="name">user</strong>.
-       The menu arrives in Sprint 2.</p>
+    <h1 class="h3" th:text="${area}">Area</h1>
+    <p>Signed in as <strong th:text="${name}">user</strong>.</p>
+    <p class="text-secondary" th:text="${note}">Note</p>
     <form th:action="@{/logout}" method="post">
         <button type="submit" class="btn btn-outline-secondary">Sign out</button>
     </form>
