@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="nav" class="navbar navbar-expand flex-wrap bg-white border-bottom">
+    <div class="container">
+        <a class="navbar-brand" th:href="@{/admin/home}">Smart Cafeteria</a>
+        <ul class="navbar-nav me-auto">
+            <li class="nav-item"><a class="nav-link" th:href="@{/admin/users}">Accounts</a></li>
+            <li class="nav-item"><a class="nav-link" th:href="@{/admin/audit}">Audit log</a></li>
+            <li class="nav-item"><a class="nav-link" th:href="@{/account/password}">Change password</a></li>
+        </ul>
+        <form th:action="@{/logout}" method="post" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Sign out</button>
+        </form>
+    </div>
+</nav>
+</body>
+</html>

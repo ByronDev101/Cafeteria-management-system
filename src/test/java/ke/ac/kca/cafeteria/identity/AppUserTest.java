@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class AppUserTest {
@@ -28,6 +29,7 @@ class AppUserTest {
         AppUser user = user();
         assertNotNull(user.getPublicId());
         assertTrue(user.isActive());
+        assertFalse(user.isMustChangePassword());
     }
 
     @Test
@@ -62,5 +64,36 @@ class AppUserTest {
         user.registerFailedLogin(later);
         assertFalse(user.isLockedAt(later));
         assertEquals(1, user.getFailedAttempts());
+    }
+
+    @Test
+    void unlockClearsLockAndCounter() {
+        AppUser user = user();
+        for (int i = 0; i < AppUser.MAX_FAILED_ATTEMPTS; i++) {
+            user.registerFailedLogin(now);
+        }
+        user.unlock();
+        assertFalse(user.isLockedAt(now));
+        assertEquals(0, user.getFailedAttempts());
+    }
+
+    @Test
+    void changePasswordStoresHashAndFlag() {
+        AppUser user = user();
+        user.changePassword("newhash", true);
+        assertEquals("newhash", user.getPasswordHash());
+        assertTrue(user.isMustChangePassword());
+        user.changePassword("another", false);
+        assertFalse(user.isMustChangePassword());
+    }
+
+    @Test
+    void replaceRolesSwapsTheWholeSet() {
+        AppUser user = user();
+        user.addRole(new Role("STUDENT"));
+        user.replaceRoles(Set.of(new Role("STAFF"), new Role("MANAGER")));
+        assertFalse(user.hasRole("STUDENT"));
+        assertTrue(user.hasRole("STAFF"));
+        assertEquals(java.util.List.of("MANAGER", "STAFF"), user.roleNames());
     }
 }

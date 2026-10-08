@@ -22,6 +22,11 @@ public class Role {
     protected Role() {
     }
 
+    /** For tests and in-memory use; real roles are seeded by the database migration. */
+    public Role(String name) {
+        this.name = name;
+    }
+
     public Long getId() {
         return id;
     }
