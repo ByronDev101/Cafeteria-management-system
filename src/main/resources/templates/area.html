@@ -12,6 +12,12 @@
     <h1 class="h3" th:text="${area}">Area</h1>
     <p>Signed in as <strong th:text="${name}">user</strong>.</p>
     <p class="text-secondary" th:text="${note}">Note</p>
+    <ul class="list-unstyled" th:if="${studentLinks}">
+        <li><a th:href="@{/student/menu}">View menu</a></li>
+    </ul>
+    <ul class="list-unstyled" th:if="${managerLinks}">
+        <li><a th:href="@{/manager/menu}">Manage menu</a></li>
+    </ul>
     <ul class="list-unstyled" th:if="${adminLinks}">
         <li><a th:href="@{/admin/users}">Accounts</a></li>
         <li><a th:href="@{/admin/audit}">Audit log</a></li>
