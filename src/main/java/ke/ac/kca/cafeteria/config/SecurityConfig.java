@@ -1,5 +1,6 @@
 package ke.ac.kca.cafeteria.config;
 
+import ke.ac.kca.cafeteria.identity.MustChangePasswordFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -7,6 +8,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 
 /**
  * Security rules (SDS section 8). URL rules here are the first layer; services add
@@ -38,7 +40,8 @@ public class SecurityConfig {
             .headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(
                     "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
-                    + "frame-ancestors 'none'; form-action 'self'")));
+                    + "frame-ancestors 'none'; form-action 'self'")))
+            .addFilterAfter(new MustChangePasswordFilter(), AnonymousAuthenticationFilter.class);
         return http.build();
     }
 

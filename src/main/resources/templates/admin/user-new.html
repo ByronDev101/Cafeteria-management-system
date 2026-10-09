@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>New account - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="bg-light">
+<div th:replace="~{fragments/admin-nav :: nav}"></div>
+<main class="container py-4 form-wrap">
+    <h1 class="h3 mb-3">New account</h1>
+
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <form th:action="@{/admin/users}" method="post" class="card card-body shadow-sm">
+        <div class="mb-3">
+            <label for="username" class="form-label">Username (student number or staff ID)</label>
+            <input id="username" name="username" type="text" class="form-control" required
+                   maxlength="50" autocomplete="off" th:value="${username}">
+        </div>
+        <div class="mb-3">
+            <label for="displayName" class="form-label">Display name</label>
+            <input id="displayName" name="displayName" type="text" class="form-control" required
+                   maxlength="100" autocomplete="off" th:value="${displayName}">
+        </div>
+        <fieldset class="mb-3">
+            <legend class="form-label fs-6">Roles</legend>
+            <div class="form-check" th:each="r : ${roleNames}">
+                <input class="form-check-input" type="checkbox" name="roles"
+                       th:id="'role-' + ${r}" th:value="${r}" th:checked="${selected.contains(r)}">
+                <label class="form-check-label" th:for="'role-' + ${r}" th:text="${r}">ROLE</label>
+            </div>
+        </fieldset>
+        <p class="text-secondary">A temporary password is generated and shown once after you save.</p>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Create account</button>
+            <a class="btn btn-outline-secondary" th:href="@{/admin/users}">Cancel</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

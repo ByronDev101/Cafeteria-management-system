@@ -12,6 +12,11 @@
     <h1 class="h3" th:text="${area}">Area</h1>
     <p>Signed in as <strong th:text="${name}">user</strong>.</p>
     <p class="text-secondary" th:text="${note}">Note</p>
+    <ul class="list-unstyled" th:if="${adminLinks}">
+        <li><a th:href="@{/admin/users}">Accounts</a></li>
+        <li><a th:href="@{/admin/audit}">Audit log</a></li>
+    </ul>
+    <p><a th:href="@{/account/password}">Change password</a></p>
     <form th:action="@{/logout}" method="post">
         <button type="submit" class="btn btn-outline-secondary">Sign out</button>
     </form>

@@ -15,6 +15,7 @@ import jakarta.persistence.Table;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -45,6 +46,9 @@ public class AppUser {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
 
     @Column(name = "failed_attempts", nullable = false)
     private int failedAttempts;
@@ -116,11 +120,46 @@ public class AppUser {
         lockedUntil = null;
     }
 
-    // ---- accessors ----
+    /** Administrator action: clear a lock and the failure counter. */
+    public void unlock() {
+        failedAttempts = 0;
+        lockedUntil = null;
+    }
+
+    // ---- password ----
+
+    /** Stores a new hash. Pass mustChange=true for temporary passwords set by an administrator. */
+    public void changePassword(String newHash, boolean mustChange) {
+        this.passwordHash = newHash;
+        this.mustChangePassword = mustChange;
+        this.failedAttempts = 0;
+        this.lockedUntil = null;
+    }
+
+    public void requirePasswordChange() {
+        this.mustChangePassword = true;
+    }
+
+    // ---- roles ----
 
     public void addRole(Role role) {
         roles.add(role);
     }
+
+    public void replaceRoles(Set<Role> newRoles) {
+        roles.clear();
+        roles.addAll(newRoles);
+    }
+
+    public boolean hasRole(String roleName) {
+        return roles.stream().anyMatch(r -> roleName.equals(r.getName()));
+    }
+
+    public List<String> roleNames() {
+        return roles.stream().map(Role::getName).sorted().toList();
+    }
+
+    // ---- accessors ----
 
     public Long getId() {
         return id;
@@ -148,6 +187,10 @@ public class AppUser {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
     }
 
     public int getFailedAttempts() {
