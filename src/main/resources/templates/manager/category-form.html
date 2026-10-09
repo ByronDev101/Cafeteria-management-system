@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' - Smart Cafeteria'">Category - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="bg-light">
+<div th:replace="~{fragments/manager-nav :: nav}"></div>
+<main class="container py-4 form-wrap">
+    <h1 class="h3 mb-3" th:text="${title}">Category</h1>
+
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <form th:action="@{${formAction}}" method="post" class="card card-body shadow-sm">
+        <div class="mb-3">
+            <label for="name" class="form-label">Name</label>
+            <input id="name" name="name" type="text" class="form-control" required maxlength="80"
+                   autocomplete="off" th:value="${name}">
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Description (optional)</label>
+            <input id="description" name="description" type="text" class="form-control" maxlength="255"
+                   autocomplete="off" th:value="${description}">
+        </div>
+        <div class="mb-3">
+            <label for="displayOrder" class="form-label">Display order (lower numbers appear first)</label>
+            <input id="displayOrder" name="displayOrder" type="number" class="form-control" min="0" max="9999"
+                   th:value="${displayOrder}">
+        </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a class="btn btn-outline-secondary" th:href="@{/manager/menu}">Cancel</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

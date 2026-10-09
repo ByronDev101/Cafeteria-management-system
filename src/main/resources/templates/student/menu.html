@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Menu - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand flex-wrap bg-white border-bottom">
+    <div class="container">
+        <a class="navbar-brand" th:href="@{/student/home}">Smart Cafeteria</a>
+        <form th:action="@{/logout}" method="post" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Sign out</button>
+        </form>
+    </div>
+</nav>
+<main class="container py-3 menu-wrap">
+    <h1 class="h3 mb-1">Menu</h1>
+    <p class="text-secondary">Prices are in Kenya shillings (KSh). Ordering arrives in the next sprint.</p>
+
+    <p th:if="${#lists.isEmpty(sections)}" class="text-secondary">The menu is not available yet.</p>
+
+    <section class="mb-4" th:each="s : ${sections}">
+        <h2 class="h5 mb-1" th:text="${s.name}">Category</h2>
+        <p class="text-secondary small mb-2" th:if="${s.description}" th:text="${s.description}">Description</p>
+        <ul class="list-group">
+            <li class="list-group-item d-flex justify-content-between align-items-start gap-3"
+                th:each="i : ${s.items}">
+                <div>
+                    <div class="fw-semibold" th:text="${i.name}">Item</div>
+                    <div class="text-secondary small" th:if="${i.description}" th:text="${i.description}">Description</div>
+                    <span th:unless="${i.available}" class="badge text-bg-warning mt-1">Not available now</span>
+                </div>
+                <div class="text-nowrap fw-semibold" th:classappend="${i.available} ? '' : 'text-secondary'"
+                     th:text="${i.priceText}">KSh 0.00</div>
+            </li>
+        </ul>
+    </section>
+</main>
+</body>
+</html>

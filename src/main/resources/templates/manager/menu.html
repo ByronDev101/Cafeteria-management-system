@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Menu - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="bg-light">
+<div th:replace="~{fragments/manager-nav :: nav}"></div>
+<main class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Menu</h1>
+        <a class="btn btn-primary" th:href="@{/manager/menu/categories/new}">New category</a>
+    </div>
+
+    <div th:if="${message}" class="alert alert-success" role="status" th:text="${message}"></div>
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <p th:if="${#lists.isEmpty(categories)}" class="text-secondary">No categories yet. Create the first one.</p>
+
+    <section class="card mb-4" th:each="c : ${categories}">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h2 class="h5 mb-0 d-inline" th:text="${c.name}">Category</h2>
+                <span th:if="${c.active}" class="badge text-bg-success ms-2">Active</span>
+                <span th:unless="${c.active}" class="badge text-bg-secondary ms-2">Inactive</span>
+                <span class="text-secondary ms-2">Order <span th:text="${c.displayOrder}">1</span></span>
+            </div>
+            <div class="d-flex flex-wrap gap-1">
+                <a class="btn btn-sm btn-outline-primary"
+                   th:href="@{/manager/menu/items/new(category=${c.publicId})}">Add item</a>
+                <a class="btn btn-sm btn-outline-secondary"
+                   th:href="@{/manager/menu/categories/{id}/edit(id=${c.publicId})}">Edit</a>
+                <form class="d-inline" method="post" th:if="${c.active}"
+                      th:action="@{/manager/menu/categories/{id}/deactivate(id=${c.publicId})}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Deactivate</button>
+                </form>
+                <form class="d-inline" method="post" th:unless="${c.active}"
+                      th:action="@{/manager/menu/categories/{id}/activate(id=${c.publicId})}">
+                    <button type="submit" class="btn btn-sm btn-outline-success">Activate</button>
+                </form>
+            </div>
+        </div>
+        <div class="card-body" th:if="${c.description}">
+            <p class="text-secondary mb-0" th:text="${c.description}">Description</p>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                <tr><th>Item</th><th>Price</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                <tr th:if="${#lists.isEmpty(c.items)}">
+                    <td colspan="4" class="text-secondary">No items in this category yet.</td>
+                </tr>
+                <tr th:each="i : ${c.items}">
+                    <td>
+                        <strong th:text="${i.name}">Item</strong>
+                        <div class="text-secondary small" th:if="${i.description}" th:text="${i.description}">Description</div>
+                    </td>
+                    <td class="text-nowrap" th:text="${i.priceText}">KSh 0.00</td>
+                    <td>
+                        <span th:if="${i.available}" class="badge text-bg-success">Available</span>
+                        <span th:unless="${i.available}" class="badge text-bg-warning">Unavailable</span>
+                        <span th:unless="${i.active}" class="badge text-bg-secondary">Inactive</span>
+                    </td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-outline-secondary"
+                           th:href="@{/manager/menu/items/{id}/edit(id=${i.publicId})}">Edit</a>
+                        <form class="d-inline" method="post" th:if="${i.available}"
+                              th:action="@{/manager/menu/items/{id}/unavailable(id=${i.publicId})}">
+                            <button type="submit" class="btn btn-sm btn-outline-warning">Mark unavailable</button>
+                        </form>
+                        <form class="d-inline" method="post" th:unless="${i.available}"
+                              th:action="@{/manager/menu/items/{id}/available(id=${i.publicId})}">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Mark available</button>
+                        </form>
+                        <form class="d-inline" method="post" th:if="${i.active}"
+                              th:action="@{/manager/menu/items/{id}/deactivate(id=${i.publicId})}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Deactivate</button>
+                        </form>
+                        <form class="d-inline" method="post" th:unless="${i.active}"
+                              th:action="@{/manager/menu/items/{id}/activate(id=${i.publicId})}">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Activate</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</body>
+</html>
