@@ -25,13 +25,27 @@ class StudentMenuControllerTest {
     @MockitoBean
     MenuService service;
 
+    private ItemView item(String id, String name, boolean available, boolean featured, Long photo) {
+        return new ItemView(id, name, "Tasty " + name, new BigDecimal("120.00"), available, true,
+                "c1", "Drinks", 8, true, featured, photo);
+    }
+
     @Test
     @WithMockUser(roles = "STUDENT")
-    void studentSeesMenuIncludingSoldOutItems() throws Exception {
-        ItemView tea = new ItemView("i1", "Tea", "Hot tea", new BigDecimal("50.00"), true, true, "c1", "Drinks");
-        ItemView juice = new ItemView("i2", "Fresh Juice", null, new BigDecimal("120.00"), false, true, "c1", "Drinks");
+    void studentSeesHeroCardsPhotosPlaceholdersAndSoldOutItems() throws Exception {
+        ItemView tea = item("i1", "Tea", true, true, 7L);
+        ItemView pilau = item("i2", "Pilau", true, true, null);
+        ItemView juice = item("i3", "Fresh Juice", false, false, null);
         when(service.studentMenu()).thenReturn(
-                List.of(new CategoryView("c1", "Drinks", null, true, 1, List.of(tea, juice))));
+                List.of(new CategoryView("c1", "Drinks", "Hot and cold", true, 1, List.of(tea, pilau, juice))));
+        mvc.perform(get("/student/menu")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void menuWithoutSpecialsStillRenders() throws Exception {
+        when(service.studentMenu()).thenReturn(
+                List.of(new CategoryView("c1", "Drinks", null, true, 1, List.of(item("i1", "Tea", true, false, null)))));
         mvc.perform(get("/student/menu")).andExpect(status().isOk());
     }
 

@@ -6,38 +6,128 @@
     <title>Menu - Smart Cafeteria</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/student-menu.js}" defer></script>
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand flex-wrap bg-white border-bottom">
-    <div class="container">
-        <a class="navbar-brand" th:href="@{/student/home}">Smart Cafeteria</a>
-        <form th:action="@{/logout}" method="post" class="d-inline">
-            <button type="submit" class="btn btn-sm btn-outline-secondary">Sign out</button>
-        </form>
-    </div>
-</nav>
-<main class="container py-3 menu-wrap">
-    <h1 class="h3 mb-1">Menu</h1>
-    <p class="text-secondary">Prices are in Kenya shillings (KSh). Ordering arrives in the next sprint.</p>
+<body>
+<th:block th:replace="~{fragments/topbar :: bar('/student/home', ${welcome}, ${today})}"/>
 
-    <p th:if="${#lists.isEmpty(sections)}" class="text-secondary">The menu is not available yet.</p>
+<div class="app-body">
+    <main class="content" id="main">
+        <h1 class="visually-hidden">Menu</h1>
 
-    <section class="mb-4" th:each="s : ${sections}">
-        <h2 class="h5 mb-1" th:text="${s.name}">Category</h2>
-        <p class="text-secondary small mb-2" th:if="${s.description}" th:text="${s.description}">Description</p>
-        <ul class="list-group">
-            <li class="list-group-item d-flex justify-content-between align-items-start gap-3"
-                th:each="i : ${s.items}">
-                <div>
-                    <div class="fw-semibold" th:text="${i.name}">Item</div>
-                    <div class="text-secondary small" th:if="${i.description}" th:text="${i.description}">Description</div>
-                    <span th:unless="${i.available}" class="badge text-bg-warning mt-1">Not available now</span>
+        <div class="search-row">
+            <label class="search-box">
+                <th:block th:replace="~{fragments/icons :: search}"/>
+                <span class="visually-hidden">Search the menu</span>
+                <input id="menu-search" type="search" autocomplete="off"
+                       placeholder="Search meals, ingredients, dietary needs...">
+            </label>
+            <a class="view-menu" href="#menu">Full menu <th:block th:replace="~{fragments/icons :: chevron}"/></a>
+        </div>
+
+        <div class="filters-mobile">
+            <div class="chip-row">
+                <button type="button" class="chip" data-filter="vegetarian" aria-pressed="false">
+                    <th:block th:replace="~{fragments/icons :: leaf}"/> Vegetarian</button>
+                <button type="button" class="chip" data-filter="budget" aria-pressed="false">Budget friendly</button>
+                <button type="button" class="chip" data-filter="fast" aria-pressed="false">Fast prep</button>
+                <button type="button" class="chip" data-filter-clear hidden>Clear</button>
+            </div>
+        </div>
+
+        <section class="hero" data-hero th:if="${!#lists.isEmpty(featured)}" aria-label="Today's special">
+            <div class="hero-slide" data-hero-slide th:each="f, st : ${featured}" th:hidden="${!st.first}">
+                <img th:if="${f.imageVersion != null}" alt=""
+                     th:src="@{/media/menu/{id}(id=${f.publicId},v=${f.imageVersion})}">
+                <div class="hero-plain" th:if="${f.imageVersion == null}"></div>
+                <div class="hero-shade"></div>
+                <div class="hero-content">
+                    <span class="eyebrow"><th:block th:replace="~{fragments/icons :: spark}"/> Today's special</span>
+                    <p class="hero-title">Fuel your day, the delicious way.</p>
+                    <p class="hero-text"><strong th:text="${f.name}">Item</strong><span th:if="${f.description}" th:text="'. ' + ${f.description}">. Description</span></p>
+                    <div class="hero-meta">
+                        <strong th:text="${f.priceText}">KSh 0.00</strong>
+                        <span th:if="${f.prepText}" th:text="${f.prepText} + ' prep'">12 min prep</span>
+                    </div>
                 </div>
-                <div class="text-nowrap fw-semibold" th:classappend="${i.available} ? '' : 'text-secondary'"
-                     th:text="${i.priceText}">KSh 0.00</div>
-            </li>
-        </ul>
-    </section>
-</main>
+            </div>
+            <button type="button" class="hero-count" data-hero-next th:if="${#lists.size(featured) > 1}"
+                    aria-label="Show the next special">
+                <strong data-hero-number>01</strong> <span data-hero-total th:text="'/ 0' + ${#lists.size(featured)}">/ 03</span>
+            </button>
+        </section>
+
+        <section id="menu" aria-labelledby="menu-heading">
+            <div class="section-heading">
+                <div>
+                    <span class="section-kicker">Fresh from the kitchen</span>
+                    <h2 id="menu-heading">Today's menu</h2>
+                </div>
+                <span class="section-count" id="menu-count" aria-live="polite"
+                      th:text="${itemCount} + (${itemCount == 1} ? ' choice' : ' choices')">0 choices</span>
+            </div>
+
+            <p th:if="${#lists.isEmpty(sections)}" class="empty-note">The menu is not available yet.</p>
+
+            <div class="category-block" data-menu-section th:each="s : ${sections}">
+                <h3 class="category-title" th:text="${s.name}">Category</h3>
+                <p class="category-desc" th:if="${s.description}" th:text="${s.description}">Description</p>
+                <div class="meal-grid">
+                    <article class="meal-card" data-menu-card
+                             th:each="i : ${s.items}"
+                             th:data-text="${i.searchText}"
+                             th:data-tags="${i.tagText}"
+                             th:classappend="${i.available} ? '' : 'is-soldout'">
+                        <div class="meal-image">
+                            <img th:if="${i.imageVersion != null}" loading="lazy"
+                                 th:alt="${i.name}"
+                                 th:src="@{/media/menu/{id}(id=${i.publicId},v=${i.imageVersion})}">
+                            <div class="meal-placeholder" th:unless="${i.imageVersion != null}">
+                                <th:block th:replace="~{fragments/icons :: utensils}"/>
+                            </div>
+                            <span class="badge-available" th:if="${i.available}">
+                                <th:block th:replace="~{fragments/icons :: check}"/> Available now</span>
+                            <span class="badge-soldout" th:unless="${i.available}">Sold out</span>
+                            <span class="badge-prep" th:if="${i.prepText}">
+                                <th:block th:replace="~{fragments/icons :: clock}"/>
+                                <span th:text="${i.prepText}">12 min</span></span>
+                        </div>
+                        <div class="meal-copy">
+                            <h4 th:text="${i.name}">Item</h4>
+                            <p th:if="${i.description}" th:text="${i.description}">Description</p>
+                            <div class="meal-foot">
+                                <span class="meal-price" th:text="${i.priceText}">KSh 0.00</span>
+                                <span class="meal-tags">
+                                    <span class="tag" th:if="${i.vegetarian}">Vegetarian</span>
+                                </span>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+
+            <div class="empty-state" id="menu-empty" hidden>No meals match your search. Try different words or clear the filters.</div>
+        </section>
+    </main>
+
+    <aside class="sidebar" aria-label="Filters and information">
+        <section class="side-section">
+            <h2 class="side-title"><th:block th:replace="~{fragments/icons :: filter}"/> Instant filters</h2>
+            <div class="chip-row">
+                <button type="button" class="chip" data-filter="vegetarian" aria-pressed="false">
+                    <th:block th:replace="~{fragments/icons :: leaf}"/> Vegetarian</button>
+                <button type="button" class="chip" data-filter="budget" aria-pressed="false">Budget friendly</button>
+                <button type="button" class="chip" data-filter="fast" aria-pressed="false">Fast prep</button>
+                <button type="button" class="chip" data-filter-clear hidden>Clear</button>
+            </div>
+        </section>
+        <section class="side-section">
+            <h2 class="side-title"><th:block th:replace="~{fragments/icons :: clock}"/> Ordering</h2>
+            <div class="info-card">
+                Scan the QR code at your table to start an order. Ordering from the menu opens in the next update.
+            </div>
+        </section>
+    </aside>
+</div>
 </body>
 </html>

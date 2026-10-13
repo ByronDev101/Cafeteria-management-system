@@ -1,13 +1,20 @@
 package ke.ac.kca.cafeteria.config;
 
 import java.security.Principal;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
-/** Temporary landing pages that prove role-based access, with links to the features built so far. */
+/** Landing pages that prove role-based access, with links to the features built so far. */
 @Controller
 public class AreaController {
+
+    private final String zone;
+
+    public AreaController(@Value("${app.display-timezone:Africa/Nairobi}") String zone) {
+        this.zone = zone;
+    }
 
     @GetMapping("/student/home")
     public String student(Principal principal, Model model) {
@@ -35,7 +42,8 @@ public class AreaController {
     private String area(String title, String note, Principal principal, Model model) {
         model.addAttribute("area", title);
         model.addAttribute("note", note);
-        model.addAttribute("name", principal.getName());
+        model.addAttribute("welcome", PageContext.welcomeName(principal));
+        model.addAttribute("today", PageContext.todayLabel(zone));
         return "area";
     }
 }
