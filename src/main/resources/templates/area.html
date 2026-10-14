@@ -16,6 +16,7 @@
         <a class="list-group-item list-group-item-action" th:if="${studentLinks}" th:href="@{/student/menu}">View menu</a>
         <a class="list-group-item list-group-item-action" th:if="${managerLinks}" th:href="@{/manager/menu}">Manage menu</a>
         <a class="list-group-item list-group-item-action" th:if="${adminLinks}" th:href="@{/admin/users}">Accounts</a>
+        <a class="list-group-item list-group-item-action" th:if="${adminLinks}" th:href="@{/admin/tables}">Tables and QR codes</a>
         <a class="list-group-item list-group-item-action" th:if="${adminLinks}" th:href="@{/admin/audit}">Audit log</a>
         <a class="list-group-item list-group-item-action" th:href="@{/account/password}">Change password</a>
     </div>

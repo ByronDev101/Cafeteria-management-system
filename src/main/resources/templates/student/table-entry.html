@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Enter table code - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/topbar :: bar('/student/menu', null, null)}"/>
+<main class="narrow">
+    <h1 class="h3 fw-bold mb-1">Enter table code</h1>
+    <p class="text-secondary mb-4">
+        Scanning the QR code on your table is quickest. If your camera cannot read it, type the code printed under it.
+    </p>
+
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <form th:action="@{/student/table}" method="post" class="card card-body shadow-sm">
+        <div class="mb-3">
+            <label for="code" class="form-label fw-semibold">Table code</label>
+            <input id="code" name="code" type="text" class="form-control form-control-lg" required
+                   maxlength="200" autocomplete="off" autocapitalize="characters" spellcheck="false" autofocus
+                   placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX">
+            <div class="form-text">Capital or small letters both work, with or without dashes.</div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Use this table</button>
+    </form>
+    <p class="mt-3"><a th:href="@{/student/menu}">Back to the menu</a></p>
+</main>
+</body>
+</html>

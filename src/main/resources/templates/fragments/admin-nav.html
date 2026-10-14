@@ -5,6 +5,7 @@
     <th:block th:replace="~{fragments/topbar :: bar('/admin/home', null, null)}"/>
     <nav class="subnav" aria-label="Administrator">
         <a th:href="@{/admin/users}">Accounts</a>
+        <a th:href="@{/admin/tables}">Tables</a>
         <a th:href="@{/admin/audit}">Audit log</a>
     </nav>
 </th:block>

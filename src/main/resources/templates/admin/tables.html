@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tables - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/print.js}" defer></script>
+</head>
+<body>
+<th:block th:replace="~{fragments/admin-nav :: nav}"/>
+<main class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+        <h1 class="h3 fw-bold mb-0">Tables and QR codes</h1>
+        <a class="btn btn-primary" th:href="@{/admin/tables/new}">New table</a>
+    </div>
+
+    <div th:if="${message}" class="alert alert-success" role="status" th:text="${message}"></div>
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <section class="mb-4" th:if="${issued}" aria-label="New QR code">
+        <div class="alert alert-warning no-print" role="alert">
+            This QR code is shown <strong>only once</strong>, because the system keeps just a scrambled copy of the code.
+            Print it now. If you lose it, issue a new one with Rotate QR.
+        </div>
+        <div class="qr-sheet">
+            <p class="qr-label" th:text="${issued.label}">Table 7</p>
+            <img th:src="${issued.dataUri}" th:alt="'QR code for ' + ${issued.label}" width="280" height="280">
+            <p class="qr-hint">Scan to order from your table</p>
+            <p class="qr-small">No camera? Sign in, choose Enter table code, and type:</p>
+            <p class="qr-code" th:text="${issued.code}">XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX</p>
+        </div>
+        <p class="mt-3 no-print">
+            <button type="button" class="btn btn-primary" data-print>Print this QR code</button>
+        </p>
+        <p class="text-secondary small no-print">
+            The QR code opens: <code th:text="${issued.url}">http://host/t/CODE</code><br>
+            If phones cannot reach that address, set <code>PUBLIC_BASE_URL</code> to your computer's address and issue the code again.
+        </p>
+    </section>
+
+    <p th:if="${#lists.isEmpty(tables)}" class="text-secondary">No tables yet. Create the first one.</p>
+
+    <div class="table-responsive no-print" th:unless="${#lists.isEmpty(tables)}">
+        <table class="table align-middle bg-white border">
+            <thead>
+            <tr><th>Table</th><th>Status</th><th>QR issued</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="t : ${tables}">
+                <td><strong th:text="${t.label}">Table 1</strong></td>
+                <td>
+                    <span th:if="${t.active}" class="badge text-bg-success">Active</span>
+                    <span th:unless="${t.active}" class="badge text-bg-secondary">Inactive</span>
+                </td>
+                <td class="text-nowrap" th:text="${t.issuedText}">1 Jan 2026, 09:00</td>
+                <td class="text-nowrap">
+                    <a class="btn btn-sm btn-outline-secondary"
+                       th:href="@{/admin/tables/{id}/edit(id=${t.publicId})}">Rename</a>
+                    <form class="d-inline" method="post" th:if="${t.active}"
+                          th:action="@{/admin/tables/{id}/rotate(id=${t.publicId})}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Rotate QR</button>
+                    </form>
+                    <form class="d-inline" method="post" th:if="${t.active}"
+                          th:action="@{/admin/tables/{id}/deactivate(id=${t.publicId})}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Deactivate</button>
+                    </form>
+                    <form class="d-inline" method="post" th:unless="${t.active}"
+                          th:action="@{/admin/tables/{id}/reactivate(id=${t.publicId})}">
+                        <button type="submit" class="btn btn-sm btn-outline-success">Reactivate (new QR)</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+</body>
+</html>
