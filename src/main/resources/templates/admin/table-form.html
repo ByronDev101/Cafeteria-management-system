@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' - Smart Cafeteria'">Table - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/admin-nav :: nav}"/>
+<main class="container py-4 form-wrap">
+    <h1 class="h3 fw-bold mb-3" th:text="${title}">Table</h1>
+
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <form th:action="@{${formAction}}" method="post" class="card card-body shadow-sm">
+        <div class="mb-3">
+            <label for="label" class="form-label fw-semibold">Table label</label>
+            <input id="label" name="label" type="text" class="form-control" required maxlength="40"
+                   autocomplete="off" th:value="${label}">
+            <div class="form-text">What students and staff see, for example Table 7 or Terrace 2.</div>
+        </div>
+        <p class="text-secondary" th:if="${formAction == '/admin/tables'}">
+            A secret code is generated and shown once as a QR code you can print.
+        </p>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a class="btn btn-outline-secondary" th:href="@{/admin/tables}">Cancel</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

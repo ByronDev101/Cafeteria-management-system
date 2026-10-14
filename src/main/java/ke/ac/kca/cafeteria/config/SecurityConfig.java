@@ -9,6 +9,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 
 /**
  * Security rules (SDS section 8). URL rules here are the first layer; services add
@@ -20,18 +21,24 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // Remember the page a visitor asked for, so scanning a table QR code while signed out
+        // continues to that table after sign-in.
+        HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
+        requestCache.setMatchingRequestParameterName(null);
+
         http
+            .requestCache(cache -> cache.requestCache(requestCache))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login", "/actuator/health", "/t/**").permitAll()
+                .requestMatchers("/login", "/actuator/health").permitAll()
                 .requestMatchers("/webjars/**", "/css/**", "/js/**", "/fonts/**", "/error").permitAll()
-                .requestMatchers("/student/**").hasRole("STUDENT")
+                .requestMatchers("/student/**", "/t/**").hasRole("STUDENT")
                 .requestMatchers("/staff/**").hasAnyRole("STAFF", "MANAGER")
                 .requestMatchers("/manager/**").hasRole("MANAGER")
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .formLogin(form -> form
                 .loginPage("/login")
-                .defaultSuccessUrl("/", true)
+                .defaultSuccessUrl("/", false)
                 .permitAll())
             .logout(logout -> logout
                 .logoutSuccessUrl("/login?logout")

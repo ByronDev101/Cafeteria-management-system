@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Table code not valid - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="auth-body">
+<main class="auth-card">
+    <div class="auth-brand">
+        <span class="brand-mark" aria-hidden="true">SC</span>
+        <span class="brand-copy"><span>Smart</span><strong>Cafeteria</strong></span>
+    </div>
+    <div class="auth-form">
+        <h1>That table code is not valid</h1>
+        <p class="text-secondary mb-4">
+            The QR code may be old or damaged. Try typing the code printed under it, or ask a member of staff.
+        </p>
+        <div class="d-grid gap-2">
+            <a class="btn btn-primary" th:href="@{/student/table}">Enter table code</a>
+            <a class="btn btn-outline-secondary" th:href="@{/student/menu}">Back to the menu</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

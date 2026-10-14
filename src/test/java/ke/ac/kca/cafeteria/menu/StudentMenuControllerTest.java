@@ -1,12 +1,18 @@
 package ke.ac.kca.cafeteria.menu;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.servlet.http.HttpSession;
 import ke.ac.kca.cafeteria.config.SecurityConfig;
+import ke.ac.kca.cafeteria.table.SelectedTable;
+import ke.ac.kca.cafeteria.table.TableService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -25,6 +31,9 @@ class StudentMenuControllerTest {
     @MockitoBean
     MenuService service;
 
+    @MockitoBean
+    TableService tables;
+
     private ItemView item(String id, String name, boolean available, boolean featured, Long photo) {
         return new ItemView(id, name, "Tasty " + name, new BigDecimal("120.00"), available, true,
                 "c1", "Drinks", 8, true, featured, photo);
@@ -39,6 +48,25 @@ class StudentMenuControllerTest {
         when(service.studentMenu()).thenReturn(
                 List.of(new CategoryView("c1", "Drinks", "Hot and cold", true, 1, List.of(tea, pilau, juice))));
         mvc.perform(get("/student/menu")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void menuShowsTheSelectedTable() throws Exception {
+        when(service.studentMenu()).thenReturn(List.of());
+        when(tables.currentTable(any(HttpSession.class))).thenReturn(Optional.of(new SelectedTable("t7", "Table 7")));
+        mvc.perform(get("/student/menu"))
+           .andExpect(status().isOk())
+           .andExpect(model().attributeExists("table"));
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void menuWithoutATableAsksForOne() throws Exception {
+        when(service.studentMenu()).thenReturn(List.of());
+        mvc.perform(get("/student/menu"))
+           .andExpect(status().isOk())
+           .andExpect(model().attributeDoesNotExist("table"));
     }
 
     @Test

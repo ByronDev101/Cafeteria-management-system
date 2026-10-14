@@ -15,6 +15,17 @@
     <main class="content" id="main">
         <h1 class="visually-hidden">Menu</h1>
 
+        <div class="table-banner" th:if="${table != null}">
+            <span>You are ordering at <strong th:text="${table.label}">Table 7</strong></span>
+            <form th:action="@{/student/table/clear}" method="post">
+                <button type="submit" class="link-button">Change table</button>
+            </form>
+        </div>
+        <div class="table-banner is-empty" th:unless="${table != null}">
+            <span>No table selected. Scan the QR code on your table.</span>
+            <a th:href="@{/student/table}">Enter table code</a>
+        </div>
+
         <div class="search-row">
             <label class="search-box">
                 <th:block th:replace="~{fragments/icons :: search}"/>
@@ -123,8 +134,11 @@
         </section>
         <section class="side-section">
             <h2 class="side-title"><th:block th:replace="~{fragments/icons :: clock}"/> Ordering</h2>
-            <div class="info-card">
-                Scan the QR code at your table to start an order. Ordering from the menu opens in the next update.
+            <div class="info-card" th:if="${table != null}">
+                <strong th:text="${table.label}">Table 7</strong> is selected. Ordering from the menu opens in the next update.
+            </div>
+            <div class="info-card" th:unless="${table != null}">
+                Scan the QR code at your table, or <a th:href="@{/student/table}">enter the table code</a>, to start an order.
             </div>
         </section>
     </aside>
