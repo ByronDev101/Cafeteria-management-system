@@ -25,6 +25,7 @@ class MenuServiceTest {
 
     private MenuCategoryRepository categories;
     private MenuItemRepository items;
+    private MenuImageStore imageStore;
     private AuditService audit;
     private MenuService service;
 
@@ -32,8 +33,9 @@ class MenuServiceTest {
     void setUp() {
         categories = mock(MenuCategoryRepository.class);
         items = mock(MenuItemRepository.class);
+        imageStore = mock(MenuImageStore.class);
         audit = mock(AuditService.class);
-        service = new MenuService(categories, items, audit);
+        service = new MenuService(categories, items, imageStore, audit);
     }
 
     private MenuCategory category(String name) {
@@ -46,6 +48,14 @@ class MenuServiceTest {
         MenuItem item = new MenuItem(category, name, "desc", new BigDecimal(price).setScale(2));
         when(items.findByPublicId(item.getPublicId())).thenReturn(Optional.of(item));
         return item;
+    }
+
+    private static ItemInput input(MenuCategory category, String name, String price) {
+        return new ItemInput(category.getPublicId(), name, "desc", price, "", false, false);
+    }
+
+    private static byte[] goodPhoto() throws Exception {
+        return ImageProcessorTest.encode(ImageProcessorTest.picture(120, 80), "png");
     }
 
     // ---- categories ----
@@ -80,44 +90,73 @@ class MenuServiceTest {
                 eq(drinks.getPublicId()), eq("SUCCESS"), anyString());
     }
 
-    // ---- items ----
+    // ---- creating items ----
 
     @Test
-    void createItemStoresPriceWithTwoDecimalsAndAudits() {
+    void createItemStoresPriceWithTwoDecimalsAndDesignFields() {
         MenuCategory meals = category("Meals");
-        service.createItem("mgr", meals.getPublicId(), "Chicken and Rice", "Roast chicken", "350");
+        ItemInput input = new ItemInput(meals.getPublicId(), "Chicken and Rice", "Roast chicken", "350", "12", true, true);
+        service.createItem("mgr", input, null);
         ArgumentCaptor<MenuItem> saved = ArgumentCaptor.forClass(MenuItem.class);
         verify(items).save(saved.capture());
-        assertEquals(new BigDecimal("350.00"), saved.getValue().getPrice());
-        assertTrue(saved.getValue().isAvailable());
-        verify(audit).record(eq("mgr"), eq("MENU_ITEM_CREATED"), eq("MENU_ITEM"),
-                eq(saved.getValue().getPublicId()), eq("SUCCESS"), argThat(d -> d.contains("350.00")));
+        MenuItem item = saved.getValue();
+        assertEquals(new BigDecimal("350.00"), item.getPrice());
+        assertEquals(12, item.getPrepMinutes());
+        assertTrue(item.isVegetarian());
+        assertTrue(item.isFeatured());
+        assertTrue(item.isAvailable());
+        verify(audit).record(eq("mgr"), eq("MENU_ITEM_CREATED"), eq("MENU_ITEM"), eq(item.getPublicId()),
+                eq("SUCCESS"), argThat(d -> d.contains("350.00")));
+        verify(imageStore, never()).save(any(), any());
     }
 
     @Test
-    void createItemRejectsBadPriceDuplicateAndInactiveCategory() {
+    void createItemWithPhotoStoresTheProcessedImageAndAudits() throws Exception {
+        MenuCategory meals = category("Meals");
+        service.createItem("mgr", input(meals, "Chicken and Rice", "350"), goodPhoto());
+        ArgumentCaptor<MenuItem> saved = ArgumentCaptor.forClass(MenuItem.class);
+        verify(items).save(saved.capture());
+        verify(imageStore).save(eq(saved.getValue()), any(ImageProcessor.Processed.class));
+        verify(audit).record(eq("mgr"), eq("MENU_ITEM_IMAGE_CHANGED"), eq("MENU_ITEM"),
+                eq(saved.getValue().getPublicId()), eq("SUCCESS"), anyString());
+    }
+
+    @Test
+    void anUnusablePhotoStopsTheWholeSave() {
         MenuCategory meals = category("Meals");
         assertThrows(MenuException.class,
-                () -> service.createItem("mgr", meals.getPublicId(), "Stew", "", "-5"));
-        assertThrows(MenuException.class,
-                () -> service.createItem("mgr", meals.getPublicId(), "Stew", "", "abc"));
+                () -> service.createItem("mgr", input(meals, "Chicken and Rice", "350"), "not an image".getBytes()));
+        verify(items, never()).save(any());
+        verify(imageStore, never()).save(any(), any());
+    }
+
+    @Test
+    void createItemRejectsBadPriceDuplicateInactiveCategoryAndBadPrepTime() {
+        MenuCategory meals = category("Meals");
+        assertThrows(MenuException.class, () -> service.createItem("mgr", input(meals, "Stew", "-5"), null));
+        assertThrows(MenuException.class, () -> service.createItem("mgr", input(meals, "Stew", "abc"), null));
+        for (String prep : new String[] {"0", "181", "abc", "-3"}) {
+            ItemInput badPrep = new ItemInput(meals.getPublicId(), "Stew", "", "100", prep, false, false);
+            assertThrows(MenuException.class, () -> service.createItem("mgr", badPrep, null), prep);
+        }
 
         when(items.existsByCategoryAndNameIgnoreCase(meals, "Tea")).thenReturn(true);
-        assertThrows(MenuException.class,
-                () -> service.createItem("mgr", meals.getPublicId(), "Tea", "", "50"));
+        assertThrows(MenuException.class, () -> service.createItem("mgr", input(meals, "Tea", "50"), null));
 
         MenuCategory closed = category("Closed");
         closed.setActive(false);
-        assertThrows(MenuException.class,
-                () -> service.createItem("mgr", closed.getPublicId(), "Soup", "", "100"));
+        assertThrows(MenuException.class, () -> service.createItem("mgr", input(closed, "Soup", "100"), null));
         verify(items, never()).save(any());
     }
+
+    // ---- updating items ----
 
     @Test
     void priceChangeIsAuditedWithOldAndNewValue() {
         MenuCategory meals = category("Meals");
         MenuItem stew = item(meals, "Beef Stew", "300");
-        service.updateItem("mgr", stew.getPublicId(), meals.getPublicId(), "Beef Stew", "desc", "320");
+        ItemInput same = new ItemInput(meals.getPublicId(), "Beef Stew", "desc", "320", "", false, false);
+        service.updateItem("mgr", stew.getPublicId(), same, null);
         assertEquals(new BigDecimal("320.00"), stew.getPrice());
         verify(audit).record(eq("mgr"), eq("MENU_PRICE_CHANGED"), eq("MENU_ITEM"), eq(stew.getPublicId()),
                 eq("SUCCESS"), argThat(d -> d.contains("300.00 -> 320.00")));
@@ -128,10 +167,54 @@ class MenuServiceTest {
     void renamingWithoutPriceChangeWritesNoPriceAudit() {
         MenuCategory meals = category("Meals");
         MenuItem stew = item(meals, "Beef Stew", "300");
-        service.updateItem("mgr", stew.getPublicId(), meals.getPublicId(), "Beef Stew Special", "desc", "300");
+        ItemInput renamed = new ItemInput(meals.getPublicId(), "Beef Stew Special", "desc", "300", "", false, false);
+        service.updateItem("mgr", stew.getPublicId(), renamed, null);
         verify(audit).record(eq("mgr"), eq("MENU_ITEM_UPDATED"), eq("MENU_ITEM"), eq(stew.getPublicId()),
                 eq("SUCCESS"), anyString());
         verify(audit, never()).record(any(), eq("MENU_PRICE_CHANGED"), any(), any(), any(), any());
+    }
+
+    @Test
+    void markingTodaysSpecialIsAnAuditedUpdate() {
+        MenuCategory meals = category("Meals");
+        MenuItem stew = item(meals, "Beef Stew", "300");
+        ItemInput special = new ItemInput(meals.getPublicId(), "Beef Stew", "desc", "300", "10", false, true);
+        service.updateItem("mgr", stew.getPublicId(), special, null);
+        assertTrue(stew.isFeatured());
+        assertEquals(10, stew.getPrepMinutes());
+        verify(audit).record(eq("mgr"), eq("MENU_ITEM_UPDATED"), eq("MENU_ITEM"), eq(stew.getPublicId()),
+                eq("SUCCESS"), anyString());
+    }
+
+    @Test
+    void replacingAPhotoIsAuditedAndABadReplacementKeepsTheOldOne() throws Exception {
+        MenuCategory meals = category("Meals");
+        MenuItem stew = item(meals, "Beef Stew", "300");
+        ItemInput same = new ItemInput(meals.getPublicId(), "Beef Stew", "desc", "300", "", false, false);
+
+        assertThrows(MenuException.class, () -> service.updateItem("mgr", stew.getPublicId(), same, "junk".getBytes()));
+        verify(imageStore, never()).save(any(), any());
+
+        service.updateItem("mgr", stew.getPublicId(), same, goodPhoto());
+        verify(imageStore).save(eq(stew), any(ImageProcessor.Processed.class));
+        verify(audit).record(eq("mgr"), eq("MENU_ITEM_IMAGE_CHANGED"), eq("MENU_ITEM"), eq(stew.getPublicId()),
+                eq("SUCCESS"), anyString());
+    }
+
+    @Test
+    void removingAPhotoIsAuditedOnlyWhenThereIsOne() {
+        MenuCategory meals = category("Meals");
+        MenuItem withPhoto = item(meals, "Beef Stew", "300");
+        withPhoto.setImageVersion(5L);
+        MenuItem withoutPhoto = item(meals, "Tea", "50");
+
+        service.removeItemImage("mgr", withPhoto.getPublicId());
+        service.removeItemImage("mgr", withoutPhoto.getPublicId());
+
+        verify(imageStore).remove(withPhoto);
+        verify(imageStore, never()).remove(withoutPhoto);
+        verify(audit).record(eq("mgr"), eq("MENU_ITEM_IMAGE_REMOVED"), eq("MENU_ITEM"),
+                eq(withPhoto.getPublicId()), eq("SUCCESS"), anyString());
     }
 
     @Test
@@ -177,5 +260,21 @@ class MenuServiceTest {
         assertFalse(shown.get(0).isAvailable());
         assertEquals("Tea", shown.get(1).getName());
         assertTrue(shown.get(1).isAvailable());
+    }
+
+    @Test
+    void heroShowsAtMostThreeAvailableFeaturedItems() {
+        MenuCategory meals = new MenuCategory("Meals", null, 1);
+        java.util.ArrayList<ItemView> all = new java.util.ArrayList<>();
+        for (int i = 1; i <= 5; i++) {
+            all.add(new ItemView("i" + i, "Dish " + i, null, new BigDecimal("100.00"), i != 2, true,
+                    meals.getPublicId(), "Meals", 10, false, true, null));
+        }
+        all.add(new ItemView("x", "Plain", null, new BigDecimal("100.00"), true, true,
+                meals.getPublicId(), "Meals", 10, false, false, null));
+        List<ItemView> hero = MenuService.featured(
+                List.of(new CategoryView(meals.getPublicId(), "Meals", null, true, 1, all)));
+        assertEquals(3, hero.size());
+        assertEquals(List.of("i1", "i3", "i4"), hero.stream().map(ItemView::getPublicId).toList());
     }
 }

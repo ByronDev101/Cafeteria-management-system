@@ -39,6 +39,19 @@ public class MenuItem {
     @Column(nullable = false, columnDefinition = "decimal(12,2)")
     private BigDecimal price;
 
+    @Column(name = "prep_minutes")
+    private Integer prepMinutes;
+
+    @Column(nullable = false)
+    private boolean vegetarian;
+
+    @Column(nullable = false)
+    private boolean featured;
+
+    /** Changes whenever the photo changes, so browsers fetch the new one. Null means no photo. */
+    @Column(name = "image_version")
+    private Long imageVersion;
+
     @Column(nullable = false)
     private boolean available = true;
 
@@ -77,11 +90,15 @@ public class MenuItem {
         updatedAt = Instant.now();
     }
 
-    public void update(MenuCategory category, String name, String description, BigDecimal price) {
+    public void update(MenuCategory category, String name, String description, BigDecimal price,
+                       Integer prepMinutes, boolean vegetarian, boolean featured) {
         this.category = category;
         this.name = name;
         this.description = description;
         this.price = price;
+        this.prepMinutes = prepMinutes;
+        this.vegetarian = vegetarian;
+        this.featured = featured;
     }
 
     public Long getId() {
@@ -106,6 +123,38 @@ public class MenuItem {
 
     public BigDecimal getPrice() {
         return price;
+    }
+
+    public Integer getPrepMinutes() {
+        return prepMinutes;
+    }
+
+    public void setPrepMinutes(Integer prepMinutes) {
+        this.prepMinutes = prepMinutes;
+    }
+
+    public boolean isVegetarian() {
+        return vegetarian;
+    }
+
+    public void setVegetarian(boolean vegetarian) {
+        this.vegetarian = vegetarian;
+    }
+
+    public boolean isFeatured() {
+        return featured;
+    }
+
+    public void setFeatured(boolean featured) {
+        this.featured = featured;
+    }
+
+    public Long getImageVersion() {
+        return imageVersion;
+    }
+
+    public void setImageVersion(Long imageVersion) {
+        this.imageVersion = imageVersion;
     }
 
     public boolean isAvailable() {

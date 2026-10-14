@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ public class MenuService {
     private static final String CATEGORY = "MENU_CATEGORY";
     private static final String ITEM = "MENU_ITEM";
     private static final String SUCCESS = "SUCCESS";
+    private static final int MAX_HERO_SLIDES = 3;
 
     static final String CATEGORY_CREATED = "MENU_CATEGORY_CREATED";
     static final String CATEGORY_UPDATED = "MENU_CATEGORY_UPDATED";
@@ -29,14 +31,19 @@ public class MenuService {
     static final String ITEM_AVAILABILITY = "MENU_ITEM_AVAILABILITY_CHANGED";
     static final String ITEM_ACTIVATED = "MENU_ITEM_ACTIVATED";
     static final String ITEM_DEACTIVATED = "MENU_ITEM_DEACTIVATED";
+    static final String IMAGE_CHANGED = "MENU_ITEM_IMAGE_CHANGED";
+    static final String IMAGE_REMOVED = "MENU_ITEM_IMAGE_REMOVED";
 
     private final MenuCategoryRepository categories;
     private final MenuItemRepository items;
+    private final MenuImageStore imageStore;
     private final AuditService audit;
 
-    public MenuService(MenuCategoryRepository categories, MenuItemRepository items, AuditService audit) {
+    public MenuService(MenuCategoryRepository categories, MenuItemRepository items,
+                       MenuImageStore imageStore, AuditService audit) {
         this.categories = categories;
         this.items = items;
+        this.imageStore = imageStore;
         this.audit = audit;
     }
 
@@ -65,6 +72,15 @@ public class MenuService {
         return result;
     }
 
+    /** Today's specials for the hero banner: featured items that can be ordered now, at most three. */
+    public static List<ItemView> featured(List<CategoryView> sections) {
+        return sections.stream()
+                .flatMap(section -> section.getItems().stream())
+                .filter(item -> item.isFeatured() && item.isAvailable())
+                .limit(MAX_HERO_SLIDES)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public CategoryView category(String publicId) {
         return CategoryView.from(findCategory(publicId), List.of());
@@ -80,6 +96,11 @@ public class MenuService {
     @Transactional(readOnly = true)
     public ItemView item(String publicId) {
         return ItemView.from(findItem(publicId));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ImagePayload> image(String itemPublicId) {
+        return items.findByPublicId(itemPublicId).flatMap(imageStore::load);
     }
 
     // ---- categories ----
@@ -134,13 +155,16 @@ public class MenuService {
 
     // ---- items ----
 
+    /** Creates an item. photo is optional raw upload bytes; an unusable photo stops the whole save. */
     @Transactional
-    public void createItem(String actor, String categoryPublicId, String name, String description, String price) {
-        MenuCategory category = findCategory(categoryPublicId);
-        String cleanName = clean(name);
-        String cleanDescription = clean(description);
+    public void createItem(String actor, ItemInput input, byte[] photo) {
+        MenuCategory category = findCategory(input.categoryId());
+        String cleanName = clean(input.name());
+        String cleanDescription = clean(input.description());
         List<String> problems = new ArrayList<>(validateItem(cleanName, cleanDescription));
-        BigDecimal parsedPrice = parsePrice(price, problems);
+        BigDecimal price = parsePrice(input.price(), problems);
+        Integer prep = parsePrep(input.prepMinutes(), problems);
+        ImageProcessor.Processed processed = processPhoto(photo, problems);
         if (!category.isActive()) {
             problems.add("Choose an active category.");
         }
@@ -149,21 +173,30 @@ public class MenuService {
         }
         failIfAny(problems);
 
-        MenuItem item = new MenuItem(category, cleanName, blankToNull(cleanDescription), parsedPrice);
+        MenuItem item = new MenuItem(category, cleanName, blankToNull(cleanDescription), price);
+        item.setPrepMinutes(prep);
+        item.setVegetarian(input.vegetarian());
+        item.setFeatured(input.featured());
         items.save(item);
         audit.record(actor, ITEM_CREATED, ITEM, item.getPublicId(), SUCCESS,
-                "name=" + cleanName + "; category=" + category.getName() + "; price=" + parsedPrice.toPlainString());
+                "name=" + cleanName + "; category=" + category.getName() + "; price=" + price.toPlainString());
+        if (processed != null) {
+            imageStore.save(item, processed);
+            audit.record(actor, IMAGE_CHANGED, ITEM, item.getPublicId(), SUCCESS,
+                    "item=" + cleanName + "; size=" + processed.jpeg().length + " bytes");
+        }
     }
 
     @Transactional
-    public void updateItem(String actor, String itemPublicId, String categoryPublicId,
-                           String name, String description, String price) {
+    public void updateItem(String actor, String itemPublicId, ItemInput input, byte[] photo) {
         MenuItem item = findItem(itemPublicId);
-        MenuCategory category = findCategory(categoryPublicId);
-        String cleanName = clean(name);
-        String cleanDescription = clean(description);
+        MenuCategory category = findCategory(input.categoryId());
+        String cleanName = clean(input.name());
+        String cleanDescription = clean(input.description());
         List<String> problems = new ArrayList<>(validateItem(cleanName, cleanDescription));
-        BigDecimal newPrice = parsePrice(price, problems);
+        BigDecimal newPrice = parsePrice(input.price(), problems);
+        Integer prep = parsePrep(input.prepMinutes(), problems);
+        ImageProcessor.Processed processed = processPhoto(photo, problems);
         boolean movingCategory = !Objects.equals(item.getCategory().getPublicId(), category.getPublicId());
         if (movingCategory && !category.isActive()) {
             problems.add("Choose an active category.");
@@ -175,9 +208,10 @@ public class MenuService {
         failIfAny(problems);
 
         BigDecimal oldPrice = item.getPrice();
-        String before = item.getName() + "|" + nullToEmpty(item.getDescription()) + "|" + item.getCategory().getPublicId();
-        item.update(category, cleanName, blankToNull(cleanDescription), newPrice);
-        String after = item.getName() + "|" + nullToEmpty(item.getDescription()) + "|" + item.getCategory().getPublicId();
+        String before = signature(item);
+        item.update(category, cleanName, blankToNull(cleanDescription), newPrice,
+                prep, input.vegetarian(), input.featured());
+        String after = signature(item);
 
         if (oldPrice.compareTo(newPrice) != 0) {
             audit.record(actor, PRICE_CHANGED, ITEM, item.getPublicId(), SUCCESS,
@@ -187,6 +221,21 @@ public class MenuService {
             audit.record(actor, ITEM_UPDATED, ITEM, item.getPublicId(), SUCCESS,
                     "name=" + cleanName + "; category=" + category.getName());
         }
+        if (processed != null) {
+            imageStore.save(item, processed);
+            audit.record(actor, IMAGE_CHANGED, ITEM, item.getPublicId(), SUCCESS,
+                    "item=" + cleanName + "; size=" + processed.jpeg().length + " bytes");
+        }
+    }
+
+    @Transactional
+    public void removeItemImage(String actor, String publicId) {
+        MenuItem item = findItem(publicId);
+        if (item.getImageVersion() == null) {
+            return;
+        }
+        imageStore.remove(item);
+        audit.record(actor, IMAGE_REMOVED, ITEM, item.getPublicId(), SUCCESS, "item=" + item.getName());
     }
 
     @Transactional
@@ -230,6 +279,12 @@ public class MenuService {
                 .orElseThrow(() -> new MenuException("That item was not found."));
     }
 
+    /** Everything about an item except price and photo, to tell whether a save changed anything. */
+    private static String signature(MenuItem item) {
+        return item.getName() + "|" + nullToEmpty(item.getDescription()) + "|" + item.getCategory().getPublicId()
+                + "|" + item.getPrepMinutes() + "|" + item.isVegetarian() + "|" + item.isFeatured();
+    }
+
     private static List<String> validateCategory(String name, String description) {
         List<String> problems = new ArrayList<>();
         if (name.length() < 2 || name.length() > 80) {
@@ -258,6 +313,35 @@ public class MenuService {
         } catch (MenuException e) {
             problems.addAll(e.getMessages());
             return BigDecimal.ZERO;
+        }
+    }
+
+    private static Integer parsePrep(String text, List<String> problems) {
+        String trimmed = clean(text);
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        try {
+            int value = Integer.parseInt(trimmed);
+            if (value >= 1 && value <= 180) {
+                return value;
+            }
+        } catch (NumberFormatException ignored) {
+            // falls through to the message below
+        }
+        problems.add("The prep time must be a whole number of minutes from 1 to 180, or left empty.");
+        return null;
+    }
+
+    private static ImageProcessor.Processed processPhoto(byte[] photo, List<String> problems) {
+        if (photo == null || photo.length == 0) {
+            return null;
+        }
+        try {
+            return ImageProcessor.process(photo);
+        } catch (MenuException e) {
+            problems.addAll(e.getMessages());
+            return null;
         }
     }
 

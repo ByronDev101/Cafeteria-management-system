@@ -7,11 +7,17 @@
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
-<body class="bg-light">
-<main class="container login-wrap">
-    <h1 class="h3">You can't open this page</h1>
-    <p class="text-secondary">Check the address, or go back and sign in with an account that has access.</p>
-    <a class="btn btn-primary" th:href="@{/}">Back to start</a>
+<body class="auth-body">
+<main class="auth-card">
+    <div class="auth-brand">
+        <span class="brand-mark" aria-hidden="true">SC</span>
+        <span class="brand-copy"><span>Smart</span><strong>Cafeteria</strong></span>
+    </div>
+    <div class="auth-form">
+        <h1>You can't open this page</h1>
+        <p class="text-secondary mb-4">Check the address, or go back and sign in with an account that has access.</p>
+        <a class="btn btn-primary" th:href="@{/}">Back to start</a>
+    </div>
 </main>
 </body>
 </html>

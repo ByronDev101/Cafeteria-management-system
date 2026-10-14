@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<header th:fragment="bar(homeUrl, welcome, dateText)" class="topbar">
+    <a class="brand-row" th:href="@{${homeUrl}}" aria-label="Smart Cafeteria home">
+        <span class="brand-mark" aria-hidden="true">SC</span>
+        <span class="brand-copy"><span>Smart</span><strong>Cafeteria</strong></span>
+    </a>
+    <div class="welcome">
+        <span th:if="${welcome != null}">WELCOME BACK,</span>
+        <strong th:if="${welcome != null}" th:text="${welcome} + '!'">NAME!</strong>
+    </div>
+    <div class="header-actions">
+        <span class="date-chip" th:if="${dateText != null}">
+            <th:block th:replace="~{fragments/icons :: calendar}"/>
+            <span th:text="${dateText}">MON, OCT 14</span>
+        </span>
+        <details class="profile-menu">
+            <summary aria-label="Account menu"><th:block th:replace="~{fragments/icons :: user}"/></summary>
+            <div class="profile-dropdown">
+                <a th:href="@{/account/password}">Change password</a>
+                <form th:action="@{/logout}" method="post">
+                    <button type="submit">Sign out</button>
+                </form>
+            </div>
+        </details>
+    </div>
+</header>
+</body>
+</html>

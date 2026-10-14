@@ -7,25 +7,18 @@
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
-<body class="bg-light">
-<main class="container login-wrap">
-    <h1 class="h3" th:text="${area}">Area</h1>
-    <p>Signed in as <strong th:text="${name}">user</strong>.</p>
+<body>
+<th:block th:replace="~{fragments/topbar :: bar('/', ${welcome}, ${today})}"/>
+<main class="narrow">
+    <h1 class="h3 fw-bold" th:text="${area}">Area</h1>
     <p class="text-secondary" th:text="${note}">Note</p>
-    <ul class="list-unstyled" th:if="${studentLinks}">
-        <li><a th:href="@{/student/menu}">View menu</a></li>
-    </ul>
-    <ul class="list-unstyled" th:if="${managerLinks}">
-        <li><a th:href="@{/manager/menu}">Manage menu</a></li>
-    </ul>
-    <ul class="list-unstyled" th:if="${adminLinks}">
-        <li><a th:href="@{/admin/users}">Accounts</a></li>
-        <li><a th:href="@{/admin/audit}">Audit log</a></li>
-    </ul>
-    <p><a th:href="@{/account/password}">Change password</a></p>
-    <form th:action="@{/logout}" method="post">
-        <button type="submit" class="btn btn-outline-secondary">Sign out</button>
-    </form>
+    <div class="list-group mb-4">
+        <a class="list-group-item list-group-item-action" th:if="${studentLinks}" th:href="@{/student/menu}">View menu</a>
+        <a class="list-group-item list-group-item-action" th:if="${managerLinks}" th:href="@{/manager/menu}">Manage menu</a>
+        <a class="list-group-item list-group-item-action" th:if="${adminLinks}" th:href="@{/admin/users}">Accounts</a>
+        <a class="list-group-item list-group-item-action" th:if="${adminLinks}" th:href="@{/admin/audit}">Audit log</a>
+        <a class="list-group-item list-group-item-action" th:href="@{/account/password}">Change password</a>
+    </div>
 </main>
 </body>
 </html>

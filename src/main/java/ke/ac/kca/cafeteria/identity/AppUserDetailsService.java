@@ -36,6 +36,7 @@ public class AppUserDetailsService implements UserDetailsService {
 
         return new AppUserPrincipal(
                 user.getUsername(),
+                user.getDisplayName(),
                 user.getPasswordHash(),
                 user.isActive(),
                 !user.isLockedAt(Instant.now()),

@@ -1,5 +1,6 @@
 package ke.ac.kca.cafeteria.menu;
 
+import java.io.IOException;
 import java.security.Principal;
 import java.util.List;
 import org.springframework.stereotype.Controller;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /** Manager screens for the menu (FR-007). Managers only; see SecurityConfig. */
@@ -97,8 +99,8 @@ public class ManagerMenuController {
 
     @GetMapping("/items/new")
     public String newItem(@RequestParam(required = false) String category, Model model) {
-        return itemForm(model, "New item", BASE + "/items", category == null ? "" : category,
-                "", "", "", null);
+        ItemInput blank = new ItemInput(category == null ? "" : category, "", "", "", "", false, false);
+        return itemForm(model, "New item", BASE + "/items", blank, null, null);
     }
 
     @PostMapping("/items")
@@ -106,14 +108,18 @@ public class ManagerMenuController {
                              @RequestParam String name,
                              @RequestParam(defaultValue = "") String description,
                              @RequestParam String price,
+                             @RequestParam(defaultValue = "") String prepMinutes,
+                             @RequestParam(defaultValue = "false") boolean vegetarian,
+                             @RequestParam(defaultValue = "false") boolean featured,
+                             @RequestParam(name = "photo", required = false) MultipartFile photo,
                              Principal principal, Model model, RedirectAttributes redirect) {
+        ItemInput input = new ItemInput(categoryId, name, description, price, prepMinutes, vegetarian, featured);
         try {
-            service.createItem(principal.getName(), categoryId, name, description, price);
+            service.createItem(principal.getName(), input, bytesOf(photo));
             redirect.addFlashAttribute("message", "Item created.");
             return LIST;
         } catch (MenuException e) {
-            return itemForm(model, "New item", BASE + "/items", categoryId, name, description, price,
-                    e.getMessages());
+            return itemForm(model, "New item", BASE + "/items", input, null, e.getMessages());
         }
     }
 
@@ -121,8 +127,11 @@ public class ManagerMenuController {
     public String editItem(@PathVariable String id, Model model, RedirectAttributes redirect) {
         try {
             ItemView item = service.item(id);
-            return itemForm(model, "Edit item", BASE + "/items/" + id, item.getCategoryPublicId(),
-                    item.getName(), orEmpty(item.getDescription()), item.getPriceInput(), null);
+            ItemInput values = new ItemInput(item.getCategoryPublicId(), item.getName(),
+                    orEmpty(item.getDescription()), item.getPriceInput(),
+                    item.getPrepMinutes() == null ? "" : String.valueOf(item.getPrepMinutes()),
+                    item.isVegetarian(), item.isFeatured());
+            return itemForm(model, "Edit item", BASE + "/items/" + id, values, item, null);
         } catch (MenuException e) {
             redirect.addFlashAttribute("errors", e.getMessages());
             return LIST;
@@ -135,15 +144,24 @@ public class ManagerMenuController {
                              @RequestParam String name,
                              @RequestParam(defaultValue = "") String description,
                              @RequestParam String price,
+                             @RequestParam(defaultValue = "") String prepMinutes,
+                             @RequestParam(defaultValue = "false") boolean vegetarian,
+                             @RequestParam(defaultValue = "false") boolean featured,
+                             @RequestParam(name = "photo", required = false) MultipartFile photo,
                              Principal principal, Model model, RedirectAttributes redirect) {
+        ItemInput input = new ItemInput(categoryId, name, description, price, prepMinutes, vegetarian, featured);
         try {
-            service.updateItem(principal.getName(), id, categoryId, name, description, price);
+            service.updateItem(principal.getName(), id, input, bytesOf(photo));
             redirect.addFlashAttribute("message", "Item saved.");
             return LIST;
         } catch (MenuException e) {
-            return itemForm(model, "Edit item", BASE + "/items/" + id, categoryId, name, description, price,
-                    e.getMessages());
+            return itemForm(model, "Edit item", BASE + "/items/" + id, input, currentItem(id), e.getMessages());
         }
+    }
+
+    @PostMapping("/items/{id}/photo/remove")
+    public String removePhoto(@PathVariable String id, Principal principal, RedirectAttributes redirect) {
+        return run(redirect, "Photo removed.", () -> service.removeItemImage(principal.getName(), id));
     }
 
     @PostMapping("/items/{id}/available")
@@ -182,19 +200,42 @@ public class ManagerMenuController {
         return "manager/category-form";
     }
 
-    private String itemForm(Model model, String title, String action, String categoryId, String name,
-                            String description, String price, List<String> errors) {
+    private String itemForm(Model model, String title, String action, ItemInput values, ItemView current,
+                            List<String> errors) {
         model.addAttribute("title", title);
         model.addAttribute("formAction", action);
         model.addAttribute("categories", service.categoryOptions());
-        model.addAttribute("categoryId", categoryId);
-        model.addAttribute("name", name);
-        model.addAttribute("description", description);
-        model.addAttribute("price", price);
+        model.addAttribute("categoryId", values.categoryId());
+        model.addAttribute("name", values.name());
+        model.addAttribute("description", values.description());
+        model.addAttribute("price", values.price());
+        model.addAttribute("prepMinutes", values.prepMinutes());
+        model.addAttribute("vegetarian", values.vegetarian());
+        model.addAttribute("featured", values.featured());
+        model.addAttribute("current", current);
         if (errors != null) {
             model.addAttribute("errors", errors);
         }
         return "manager/item-form";
+    }
+
+    private ItemView currentItem(String id) {
+        try {
+            return service.item(id);
+        } catch (MenuException e) {
+            return null;
+        }
+    }
+
+    private static byte[] bytesOf(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return null;
+        }
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new MenuException("The photo could not be read. Please try again.");
+        }
     }
 
     private String run(RedirectAttributes redirect, String success, Runnable action) {
