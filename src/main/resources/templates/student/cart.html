@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Your cart - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/topbar :: bar('/student/menu', ${welcome}, ${today})}"/>
+<main class="page-narrow">
+    <h1>Your cart</h1>
+
+    <div th:if="${message}" class="alert alert-success" role="status" th:text="${message}"></div>
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <div class="table-banner" th:if="${table != null}">
+        <span>You are ordering at <strong th:text="${table.label}">Table 7</strong></span>
+        <a th:href="@{/student/table}">Change table</a>
+    </div>
+    <div class="table-banner is-empty" th:unless="${table != null}">
+        <span>No table selected. Scan the QR code on your table to place an order.</span>
+        <a th:href="@{/student/table}">Enter table code</a>
+    </div>
+
+    <p class="empty-note" th:if="${cart.empty}">
+        Your cart is empty. <a th:href="@{/student/menu}">Browse the menu</a> and press <strong>+ Add</strong>.
+    </p>
+
+    <ul class="cart-list" th:unless="${cart.empty}">
+        <li class="cart-line" th:each="l : ${cart.lines}" th:classappend="${l.orderable} ? '' : 'is-problem'">
+            <div class="cart-thumb">
+                <img th:if="${l.imageVersion != null}" alt=""
+                     th:src="@{/media/menu/{id}(id=${l.itemId},v=${l.imageVersion})}">
+                <th:block th:unless="${l.imageVersion != null}">
+                    <th:block th:replace="~{fragments/icons :: utensils}"/>
+                </th:block>
+            </div>
+            <div>
+                <div class="cart-name" th:text="${l.name}">Item</div>
+                <div class="cart-meta" th:if="${l.orderable}" th:text="${l.unitPriceText} + ' each'">KSh 0.00 each</div>
+                <div th:unless="${l.orderable}">
+                    <span class="badge text-bg-warning" th:text="${l.problem}">sold out</span>
+                    <span class="cart-meta">Remove it to continue.</span>
+                </div>
+            </div>
+            <form method="post" th:action="@{/student/cart/update}">
+                <input type="hidden" name="itemId" th:value="${l.itemId}">
+                <label class="visually-hidden" th:for="'qty-' + ${l.itemId}" th:text="'Quantity of ' + ${l.name}">Quantity</label>
+                <input class="form-control qty-input" type="number" min="0" max="10" name="quantity"
+                       th:id="'qty-' + ${l.itemId}" th:value="${l.quantity}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Update</button>
+            </form>
+            <div class="cart-line-total" th:text="${l.lineTotalText}">KSh 0.00</div>
+            <form method="post" th:action="@{/student/cart/remove}">
+                <input type="hidden" name="itemId" th:value="${l.itemId}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+        </li>
+    </ul>
+
+    <form method="post" th:action="@{/student/orders}" class="card card-body shadow-sm" th:unless="${cart.empty}">
+        <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}">
+        <fieldset class="mb-3">
+            <legend class="fs-6 fw-bold">How will you pay?</legend>
+            <div class="form-check mb-2" th:each="m, st : ${paymentMethods}">
+                <input class="form-check-input" type="radio" name="paymentMethod" required
+                       th:id="'pay-' + ${m.code}" th:value="${m.code}" th:checked="${st.first}">
+                <label class="form-check-label" th:for="'pay-' + ${m.code}">
+                    <strong th:text="${m.label}">Cash</strong>
+                    <span class="d-block text-secondary small" th:text="${m.hint}">Hint</span>
+                </label>
+            </div>
+        </fieldset>
+        <div class="cart-summary"><span>Total</span><span th:text="${cart.totalText}">KSh 0.00</span></div>
+        <button type="submit" class="btn btn-primary btn-lg w-100"
+                th:disabled="${!cart.canPlace or table == null}">Place order</button>
+        <p class="small text-secondary mt-2 mb-0" th:if="${!cart.canPlace}">Remove the unavailable items above to place your order.</p>
+        <p class="small text-secondary mt-2 mb-0" th:if="${table == null}">Choose your table first.</p>
+    </form>
+
+    <div class="d-flex justify-content-between mt-3" th:unless="${cart.empty}">
+        <a th:href="@{/student/menu}">Keep browsing</a>
+        <form method="post" th:action="@{/student/cart/clear}" class="m-0">
+            <button type="submit" class="link-button">Empty cart</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>

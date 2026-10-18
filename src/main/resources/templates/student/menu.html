@@ -15,6 +15,11 @@
     <main class="content" id="main">
         <h1 class="visually-hidden">Menu</h1>
 
+        <div th:if="${message}" class="alert alert-success" role="status" th:text="${message}"></div>
+        <div th:if="${errors}" class="alert alert-danger" role="alert">
+            <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+        </div>
+
         <div class="table-banner" th:if="${table != null}">
             <span>You are ordering at <strong th:text="${table.label}">Table 7</strong></span>
             <form th:action="@{/student/table/clear}" method="post">
@@ -25,6 +30,13 @@
             <span>No table selected. Scan the QR code on your table.</span>
             <a th:href="@{/student/table}">Enter table code</a>
         </div>
+
+        <a class="order-banner" th:each="o : ${activeOrders}"
+           th:href="@{/student/orders/{id}(id=${o.publicId})}">
+            <span><strong th:text="${o.orderNumber}">SC-ABC123</strong>
+                <span class="status-pill" th:classappend="'status-' + ${o.statusClass}" th:text="${o.statusLabel}">Preparing</span></span>
+            <span class="order-banner-link">Track your order</span>
+        </a>
 
         <div class="search-row">
             <label class="search-box">
@@ -56,9 +68,16 @@
                     <span class="eyebrow"><th:block th:replace="~{fragments/icons :: spark}"/> Today's special</span>
                     <p class="hero-title">Fuel your day, the delicious way.</p>
                     <p class="hero-text"><strong th:text="${f.name}">Item</strong><span th:if="${f.description}" th:text="'. ' + ${f.description}">. Description</span></p>
-                    <div class="hero-meta">
-                        <strong th:text="${f.priceText}">KSh 0.00</strong>
-                        <span th:if="${f.prepText}" th:text="${f.prepText} + ' prep'">12 min prep</span>
+                    <div class="hero-actions">
+                        <form method="post" th:action="@{/student/cart/add}">
+                            <input type="hidden" name="itemId" th:value="${f.publicId}">
+                            <input type="hidden" name="quantity" value="1">
+                            <button type="submit" class="hero-button">Order now</button>
+                        </form>
+                        <div class="hero-meta">
+                            <strong th:text="${f.priceText}">KSh 0.00</strong>
+                            <span th:if="${f.prepText}" th:text="${f.prepText} + ' prep'">12 min prep</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -85,6 +104,7 @@
                 <p class="category-desc" th:if="${s.description}" th:text="${s.description}">Description</p>
                 <div class="meal-grid">
                     <article class="meal-card" data-menu-card
+                             th:id="'item-' + ${i.publicId}"
                              th:each="i : ${s.items}"
                              th:data-text="${i.searchText}"
                              th:data-tags="${i.tagText}"
@@ -106,11 +126,18 @@
                         <div class="meal-copy">
                             <h4 th:text="${i.name}">Item</h4>
                             <p th:if="${i.description}" th:text="${i.description}">Description</p>
+                            <div class="meal-tags" th:if="${i.vegetarian}">
+                                <span class="tag">Vegetarian</span>
+                            </div>
                             <div class="meal-foot">
                                 <span class="meal-price" th:text="${i.priceText}">KSh 0.00</span>
-                                <span class="meal-tags">
-                                    <span class="tag" th:if="${i.vegetarian}">Vegetarian</span>
-                                </span>
+                                <form method="post" th:action="@{/student/cart/add}" th:if="${i.available}">
+                                    <input type="hidden" name="itemId" th:value="${i.publicId}">
+                                    <input type="hidden" name="quantity" value="1">
+                                    <button type="submit" class="add-button"
+                                            th:attr="aria-label='Add ' + ${i.name} + ' to your cart'">+ Add</button>
+                                </form>
+                                <span class="sold-label" th:unless="${i.available}">Sold out</span>
                             </div>
                         </div>
                     </article>
@@ -133,13 +160,23 @@
             </div>
         </section>
         <section class="side-section">
-            <h2 class="side-title"><th:block th:replace="~{fragments/icons :: clock}"/> Ordering</h2>
-            <div class="info-card" th:if="${table != null}">
-                <strong th:text="${table.label}">Table 7</strong> is selected. Ordering from the menu opens in the next update.
+            <h2 class="side-title"><th:block th:replace="~{fragments/icons :: cart}"/> Your cart</h2>
+            <div class="info-card" th:if="${cart != null and !cart.empty}">
+                <strong th:text="${cart.unitCount} + (${cart.unitCount == 1} ? ' item' : ' items')">2 items</strong>
+                &middot; <span th:text="${cart.totalText}">KSh 0.00</span>
+                <a class="btn btn-primary btn-sm mt-2 w-100" th:href="@{/student/cart}">View cart and order</a>
             </div>
-            <div class="info-card" th:unless="${table != null}">
-                Scan the QR code at your table, or <a th:href="@{/student/table}">enter the table code</a>, to start an order.
+            <div class="info-card" th:unless="${cart != null and !cart.empty}">
+                Your cart is empty. Press <strong>+ Add</strong> on a meal to start an order.
             </div>
+        </section>
+        <section class="side-section" th:if="${activeOrders != null and !#lists.isEmpty(activeOrders)}">
+            <h2 class="side-title"><th:block th:replace="~{fragments/icons :: clock}"/> Live order status</h2>
+            <a class="side-order" th:each="o : ${activeOrders}" th:href="@{/student/orders/{id}(id=${o.publicId})}">
+                <span><strong th:text="${o.orderNumber}">SC-ABC123</strong><br>
+                    <span class="text-secondary small" th:text="${o.tableLabel} + ' - ' + ${o.totalText}">Table 1 - KSh 0.00</span></span>
+                <span class="status-pill" th:classappend="'status-' + ${o.statusClass}" th:text="${o.statusLabel}">Preparing</span>
+            </a>
         </section>
     </aside>
 </div>

@@ -174,6 +174,14 @@ public class TableService {
         return Optional.of(new SelectedTable(table.get().getPublicId(), table.get().getLabel()));
     }
 
+    /** A table by its public ID, only when it is switched on. Used when an order is placed. */
+    @Transactional(readOnly = true)
+    public Optional<TableRef> activeTable(String publicId) {
+        return tables.findByPublicId(publicId)
+                .filter(CafeteriaTable::isActive)
+                .map(table -> new TableRef(table.getId(), table.getPublicId(), table.getLabel()));
+    }
+
     // ---- helpers ----
 
     private TableView view(CafeteriaTable table) {

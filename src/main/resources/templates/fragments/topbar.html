@@ -15,9 +15,14 @@
             <th:block th:replace="~{fragments/icons :: calendar}"/>
             <span th:text="${dateText}">MON, OCT 14</span>
         </span>
+        <a class="cart-link" th:if="${cartCount != null}" th:href="@{/student/cart}" aria-label="Your cart">
+            <th:block th:replace="~{fragments/icons :: cart}"/>
+            <span class="cart-badge" th:if="${cartCount > 0}" th:text="${cartCount}">2</span>
+        </a>
         <details class="profile-menu">
             <summary aria-label="Account menu"><th:block th:replace="~{fragments/icons :: user}"/></summary>
             <div class="profile-dropdown">
+                <a th:if="${cartCount != null}" th:href="@{/student/orders}">My orders</a>
                 <a th:href="@{/account/password}">Change password</a>
                 <form th:action="@{/logout}" method="post">
                     <button type="submit">Sign out</button>

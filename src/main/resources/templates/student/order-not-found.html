@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Order not found - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/topbar :: bar('/student/menu', ${welcome}, ${today})}"/>
+<main class="page-narrow">
+    <h1>Order not found</h1>
+    <p class="text-secondary">We could not find that order. It may not exist, or it may not be yours.</p>
+    <p><a class="btn btn-primary" th:href="@{/student/orders}">My orders</a></p>
+</main>
+</body>
+</html>
