@@ -215,4 +215,18 @@ class TableServiceTest {
 
         assertEquals(List.of("Table 1", "Table 2", "Table 10", "Terrace 1"), labels);
     }
+
+    // ---- used by ordering ----
+
+    @Test
+    void activeTableIsFoundOnlyWhileSwitchedOn() {
+        Stored t = stored("Table 7");
+        TableRef found = service.activeTable(t.table().getPublicId()).orElseThrow();
+        assertEquals("Table 7", found.label());
+        assertEquals(t.table().getPublicId(), found.publicId());
+
+        service.deactivate("admin", t.table().getPublicId());
+        assertTrue(service.activeTable(t.table().getPublicId()).isEmpty());
+        assertTrue(service.activeTable("nope").isEmpty());
+    }
 }

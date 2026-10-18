@@ -8,6 +8,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import jakarta.servlet.http.HttpSession;
 import ke.ac.kca.cafeteria.config.SecurityConfig;
+import ke.ac.kca.cafeteria.ordering.Cart;
+import ke.ac.kca.cafeteria.ordering.CartLine;
+import ke.ac.kca.cafeteria.ordering.CartService;
+import ke.ac.kca.cafeteria.ordering.CartSession;
+import ke.ac.kca.cafeteria.ordering.CartView;
+import ke.ac.kca.cafeteria.ordering.OrderService;
+import ke.ac.kca.cafeteria.ordering.OrderSummary;
 import ke.ac.kca.cafeteria.table.SelectedTable;
 import ke.ac.kca.cafeteria.table.TableService;
 import java.math.BigDecimal;
@@ -34,6 +41,12 @@ class StudentMenuControllerTest {
     @MockitoBean
     TableService tables;
 
+    @MockitoBean
+    CartService carts;
+
+    @MockitoBean
+    OrderService orders;
+
     private ItemView item(String id, String name, boolean available, boolean featured, Long photo) {
         return new ItemView(id, name, "Tasty " + name, new BigDecimal("120.00"), available, true,
                 "c1", "Drinks", 8, true, featured, photo);
@@ -58,6 +71,30 @@ class StudentMenuControllerTest {
         mvc.perform(get("/student/menu"))
            .andExpect(status().isOk())
            .andExpect(model().attributeExists("table"));
+    }
+
+    @Test
+    @WithMockUser(username = "amina", roles = "STUDENT")
+    void menuShowsAddButtonsTheCartSummaryAndLiveOrders() throws Exception {
+        when(service.studentMenu()).thenReturn(List.of(new CategoryView("c1", "Drinks", null, true, 1,
+                List.of(item("i1", "Tea", true, true, null), item("i2", "Fresh Juice", false, false, null)))));
+        when(carts.view(any())).thenReturn(new CartView(
+                List.of(new CartLine("i1", "Tea", "KSh 120.00", 2, "KSh 240.00", true, null, null)),
+                new BigDecimal("240.00"), "KSh 240.00", 2, true));
+        when(orders.activeOrders("amina")).thenReturn(List.of(new OrderSummary("o1", "SC-ABC123", "PREPARING",
+                "Preparing", true, "KSh 240.00", "1 Jan 2026, 12:00", "Table 7", "2 x Tea")));
+        mvc.perform(get("/student/menu")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void everyPageKnowsHowManyItemsAreInTheCart() throws Exception {
+        when(service.studentMenu()).thenReturn(List.of());
+        Cart cart = new Cart();
+        cart.add("i1", 3);
+        mvc.perform(get("/student/menu").sessionAttr(CartSession.ATTRIBUTE, cart))
+           .andExpect(status().isOk())
+           .andExpect(model().attribute("cartCount", 3));
     }
 
     @Test

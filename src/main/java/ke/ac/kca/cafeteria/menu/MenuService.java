@@ -3,7 +3,10 @@ package ke.ac.kca.cafeteria.menu;
 import ke.ac.kca.cafeteria.reporting.AuditService;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -101,6 +104,26 @@ public class MenuService {
     @Transactional(readOnly = true)
     public Optional<ImagePayload> image(String itemPublicId) {
         return items.findByPublicId(itemPublicId).flatMap(imageStore::load);
+    }
+
+    /**
+     * Looks up items for the cart and checkout with today's price and whether they can be ordered right now.
+     * IDs that match no item are simply missing from the result.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, OrderableItem> lookup(Collection<String> publicIds) {
+        Map<String, OrderableItem> result = new LinkedHashMap<>();
+        for (String publicId : publicIds) {
+            items.findByPublicId(publicId).ifPresent(item -> result.put(publicId, orderable(item)));
+        }
+        return result;
+    }
+
+    private static OrderableItem orderable(MenuItem item) {
+        boolean listed = item.isActive() && item.getCategory().isActive();
+        String problem = !listed ? "no longer on the menu" : (!item.isAvailable() ? "sold out" : null);
+        return new OrderableItem(item.getId(), item.getPublicId(), item.getName(), item.getPrice(),
+                problem == null, problem, item.getImageVersion());
     }
 
     // ---- categories ----

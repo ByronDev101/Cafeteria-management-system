@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My orders - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/topbar :: bar('/student/menu', ${welcome}, ${today})}"/>
+<main class="page-narrow">
+    <h1>My orders</h1>
+
+    <p class="empty-note" th:if="${#lists.isEmpty(page.content)}">
+        You have not placed any orders yet. <a th:href="@{/student/menu}">Browse the menu</a>.
+    </p>
+
+    <div class="d-grid gap-3 mb-4">
+        <a class="order-card" th:each="o : ${page.content}" th:href="@{/student/orders/{id}(id=${o.publicId})}">
+            <div class="order-card-head">
+                <span class="order-card-number" th:text="${o.orderNumber}">SC-ABC123</span>
+                <span class="status-pill" th:classappend="'status-' + ${o.statusClass}" th:text="${o.statusLabel}">Submitted</span>
+            </div>
+            <div class="text-secondary small" th:text="${o.createdText} + ' - ' + ${o.tableLabel}">1 Jan 2026, 12:00 - Table 1</div>
+            <div th:text="${o.itemSummary}">2 x Tea</div>
+            <strong th:text="${o.totalText}">KSh 0.00</strong>
+        </a>
+    </div>
+
+    <div class="d-flex justify-content-between" th:if="${page.totalPages > 1}">
+        <a th:if="${page.hasPrevious()}" class="btn btn-sm btn-outline-secondary"
+           th:href="@{/student/orders(page=${page.number - 1})}">Newer</a>
+        <span class="text-secondary">Page <span th:text="${page.number + 1}">1</span>
+            of <span th:text="${page.totalPages}">1</span></span>
+        <a th:if="${page.hasNext()}" class="btn btn-sm btn-outline-secondary"
+           th:href="@{/student/orders(page=${page.number + 1})}">Older</a>
+    </div>
+</main>
+</body>
+</html>
