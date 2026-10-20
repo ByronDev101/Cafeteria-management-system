@@ -40,6 +40,8 @@
         <p class="small text-secondary mt-3 mb-0" th:unless="${order.terminal}">This page updates by itself.</p>
     </section>
 
+    <div class="alert alert-secondary" role="status" th:if="${order.cancelNote}" th:text="${order.cancelNote}">Cancelled by staff: out of stock</div>
+
     <section class="card card-body mb-4" aria-label="Items">
         <div class="table-responsive">
             <table class="table table-sm align-middle mb-2">

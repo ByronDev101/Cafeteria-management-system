@@ -24,12 +24,15 @@ public class AreaController {
 
     @GetMapping("/staff/home")
     public String staff(Principal principal, Model model) {
-        return area("Staff area", "The order queue arrives in Sprint 4.", principal, model);
+        model.addAttribute("boardLink", true);
+        model.addAttribute("availabilityLink", true);
+        return area("Staff area", "Run the order board and keep the menu up to date.", principal, model);
     }
 
     @GetMapping("/manager/home")
     public String manager(Principal principal, Model model) {
         model.addAttribute("managerLinks", true);
+        model.addAttribute("boardLink", true);
         return area("Manager area", "Manage the menu. Reports arrive in later sprints.", principal, model);
     }
 

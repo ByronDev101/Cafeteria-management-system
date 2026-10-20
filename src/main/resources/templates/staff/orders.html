@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Order board - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/staff-board.js}" defer></script>
+</head>
+<body>
+<th:block th:replace="~{fragments/staff-nav :: nav}"/>
+<main class="board" data-board th:attr="data-token=${token},data-poll-url=@{/staff/orders/poll}">
+
+    <div class="board-head">
+        <h1>Order board</h1>
+        <nav class="board-tabs" aria-label="Order views">
+            <a class="board-tab" th:each="f : ${filters}" th:href="@{/staff/orders(filter=${f.code})}"
+               th:classappend="${f == filter} ? 'is-active' : ''" th:attr="aria-current=${f == filter} ? 'page' : null">
+                <span th:text="${f.label}">All active</span>
+                <span class="board-count" th:if="${counts.get(f) != null}" th:text="${counts.get(f)}">0</span>
+            </a>
+        </nav>
+    </div>
+
+    <div th:if="${message}" class="alert alert-success" role="status" th:text="${message}"></div>
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <p class="empty-note" th:if="${#lists.isEmpty(orders)}">
+        <span th:if="${filter.finishedView}">No orders have finished today.</span>
+        <span th:unless="${filter.finishedView}">No orders waiting here right now. New orders appear by themselves.</span>
+    </p>
+
+    <div class="board-grid">
+        <article class="ticket" th:each="o : ${orders}" th:classappend="'ticket-' + ${o.statusClass}">
+            <header class="ticket-head">
+                <span class="ticket-number" th:text="${o.orderNumber}">SC-ABC123</span>
+                <span class="status-pill" th:classappend="'status-' + ${o.statusClass}" th:text="${o.statusLabel}">Submitted</span>
+            </header>
+            <div class="ticket-table" th:text="${o.tableLabel}">Table 7</div>
+            <div class="ticket-time">
+                <span th:text="${o.createdText}">12:05</span>
+                <span class="ticket-wait" th:text="${o.waitText}">7 min ago</span>
+            </div>
+            <ul class="ticket-lines">
+                <li th:each="line : ${o.lines}" th:text="${line}">2 x Tea</li>
+            </ul>
+            <div class="ticket-foot">
+                <span><span th:text="${o.paymentLabel}">Cash</span></span>
+                <strong th:text="${o.totalText}">KSh 0.00</strong>
+            </div>
+            <p class="ticket-note" th:if="${o.cancelNote}" th:text="${o.cancelNote}">Cancelled by staff: out of stock</p>
+
+            <form class="ticket-action" method="post" th:if="${o.nextStatusCode}"
+                  th:action="@{/staff/orders/{id}/transition(id=${o.publicId})}">
+                <input type="hidden" name="to" th:value="${o.nextStatusCode}">
+                <input type="hidden" name="version" th:value="${o.version}">
+                <input type="hidden" name="filter" th:value="${filter.code}">
+                <button type="submit" class="btn btn-primary w-100" th:text="${o.nextActionLabel}">Accept order</button>
+            </form>
+
+            <details class="ticket-cancel" th:if="${o.canCancel}">
+                <summary>Cancel this order</summary>
+                <form method="post" th:action="@{/staff/orders/{id}/transition(id=${o.publicId})}">
+                    <input type="hidden" name="to" value="CANCELLED">
+                    <input type="hidden" name="version" th:value="${o.version}">
+                    <input type="hidden" name="filter" th:value="${filter.code}">
+                    <label class="visually-hidden" th:for="'reason-' + ${o.publicId}">Reason for cancelling</label>
+                    <input class="form-control form-control-sm mb-2" type="text" name="reason" required
+                           minlength="3" maxlength="255" autocomplete="off"
+                           th:id="'reason-' + ${o.publicId}" placeholder="Reason, for example: out of stock">
+                    <button type="submit" class="btn btn-sm btn-outline-danger w-100">Cancel order</button>
+                </form>
+            </details>
+        </article>
+    </div>
+</main>
+</body>
+</html>

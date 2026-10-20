@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="nav">
+    <th:block th:replace="~{fragments/topbar :: bar('/staff/home', null, null)}"/>
+    <nav class="subnav" aria-label="Staff">
+        <a th:href="@{/staff/orders}">Orders</a>
+        <a th:href="@{/staff/availability}">Item availability</a>
+    </nav>
+</th:block>
+</body>
+</html>

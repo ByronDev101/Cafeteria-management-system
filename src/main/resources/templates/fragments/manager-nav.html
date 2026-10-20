@@ -4,6 +4,7 @@
 <th:block th:fragment="nav">
     <th:block th:replace="~{fragments/topbar :: bar('/manager/home', null, null)}"/>
     <nav class="subnav" aria-label="Manager">
+        <a th:href="@{/staff/orders}">Orders</a>
         <a th:href="@{/manager/menu}">Menu</a>
     </nav>
 </th:block>

@@ -215,7 +215,23 @@ public class OrderService {
         return new OrderView(order.getPublicId(), order.getOrderNumber(), current.name(), current.getLabel(),
                 current.isTerminal(), current.studentMayCancel(), order.getTableLabel(),
                 order.getPaymentMethod().getLabel(), PriceParser.format(order.getTotal()),
-                timeFormat.format(order.getCreatedAt()), lines, steps(order, current));
+                timeFormat.format(order.getCreatedAt()), lines, steps(order, current), cancelNote(order, current));
+    }
+
+    /** For a cancelled order: who cancelled it and why, worded for the student. */
+    private static String cancelNote(CustomerOrder order, OrderStatus current) {
+        if (current != OrderStatus.CANCELLED) {
+            return null;
+        }
+        for (OrderStatusHistory entry : order.getHistory()) {
+            if (entry.getToStatus() == OrderStatus.CANCELLED) {
+                if (entry.getActorUsername().equals(order.getStudent().getUsername())) {
+                    return "You cancelled this order.";
+                }
+                return "Cancelled by staff" + (entry.getReason() == null ? "." : ": " + entry.getReason());
+            }
+        }
+        return null;
     }
 
     /** The progress tracker: which steps are done, which one is current, and when each was reached. */

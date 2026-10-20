@@ -17,10 +17,18 @@ public final class OrderView {
     private final String createdText;
     private final List<OrderLineView> lines;
     private final List<OrderStepView> steps;
+    private final String cancelNote;
 
     public OrderView(String publicId, String orderNumber, String statusCode, String statusLabel, boolean terminal,
                      boolean canCancel, String tableLabel, String paymentLabel, String totalText, String createdText,
                      List<OrderLineView> lines, List<OrderStepView> steps) {
+        this(publicId, orderNumber, statusCode, statusLabel, terminal, canCancel, tableLabel, paymentLabel, totalText,
+                createdText, lines, steps, null);
+    }
+
+    public OrderView(String publicId, String orderNumber, String statusCode, String statusLabel, boolean terminal,
+                     boolean canCancel, String tableLabel, String paymentLabel, String totalText, String createdText,
+                     List<OrderLineView> lines, List<OrderStepView> steps, String cancelNote) {
         this.publicId = publicId;
         this.orderNumber = orderNumber;
         this.statusCode = statusCode;
@@ -33,6 +41,7 @@ public final class OrderView {
         this.createdText = createdText;
         this.lines = List.copyOf(lines);
         this.steps = List.copyOf(steps);
+        this.cancelNote = cancelNote;
     }
 
     public String getPublicId() {
@@ -85,5 +94,10 @@ public final class OrderView {
 
     public List<OrderStepView> getSteps() {
         return steps;
+    }
+
+    /** For cancelled orders: who cancelled and why, in words the student can read. Otherwise null. */
+    public String getCancelNote() {
+        return cancelNote;
     }
 }
