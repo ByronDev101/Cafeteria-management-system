@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Item availability - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/staff-nav :: nav}"/>
+<main class="container py-4">
+    <h1 class="h3 fw-bold">Item availability</h1>
+    <p class="text-secondary">Mark an item sold out when it runs out, and back on when it returns. Students see the change straight away.</p>
+
+    <div th:if="${message}" class="alert alert-success" role="status" th:text="${message}"></div>
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <ul class="mb-0"><li th:each="e : ${errors}" th:text="${e}"></li></ul>
+    </div>
+
+    <p class="empty-note" th:if="${#lists.isEmpty(categories)}">There are no menu items yet.</p>
+
+    <section class="card mb-4" th:each="c : ${categories}" th:if="${c.active}">
+        <div class="card-header"><h2 class="h5 mb-0" th:text="${c.name}">Category</h2></div>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2"
+                th:each="i : ${c.items}" th:if="${i.active}">
+                <span>
+                    <strong th:text="${i.name}">Item</strong>
+                    <span class="text-secondary ms-2" th:text="${i.priceText}">KSh 0.00</span>
+                    <span th:if="${i.available}" class="badge text-bg-success ms-2">Available</span>
+                    <span th:unless="${i.available}" class="badge text-bg-warning ms-2">Sold out</span>
+                </span>
+                <form method="post" class="m-0" th:if="${i.available}"
+                      th:action="@{/staff/availability/{id}/unavailable(id=${i.publicId})}">
+                    <button type="submit" class="btn btn-sm btn-outline-warning">Mark sold out</button>
+                </form>
+                <form method="post" class="m-0" th:unless="${i.available}"
+                      th:action="@{/staff/availability/{id}/available(id=${i.publicId})}">
+                    <button type="submit" class="btn btn-sm btn-outline-success">Back on the menu</button>
+                </form>
+            </li>
+        </ul>
+    </section>
+</main>
+</body>
+</html>

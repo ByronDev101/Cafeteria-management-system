@@ -299,4 +299,28 @@ class OrderServiceTest {
         assertThrows(IllegalStateException.class, () -> order.moveTo(OrderStatus.ACCEPTED, "staff1", null));
         assertEquals(OrderStatus.CANCELLED, order.getStatus());
     }
+
+    // ---- cancellation notes ----
+
+    @Test
+    void aStaffCancellationIsExplainedToTheStudent() {
+        CustomerOrder order = storedOrder();
+        order.moveTo(OrderStatus.CANCELLED, "sam", "Out of stock");
+        assertEquals("Cancelled by staff: Out of stock", service.detail("amina", order.getPublicId()).getCancelNote());
+    }
+
+    @Test
+    void aStudentsOwnCancellationIsSaidPlainly() {
+        CustomerOrder order = storedOrder();
+        service.cancelOwn("amina", order.getPublicId());
+        assertEquals("You cancelled this order.", service.detail("amina", order.getPublicId()).getCancelNote());
+    }
+
+    @Test
+    void ordersThatAreNotCancelledHaveNoNote() {
+        CustomerOrder order = storedOrder();
+        assertEquals(null, service.detail("amina", order.getPublicId()).getCancelNote());
+        order.moveTo(OrderStatus.ACCEPTED, "sam", null);
+        assertEquals(null, service.detail("amina", order.getPublicId()).getCancelNote());
+    }
 }

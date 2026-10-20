@@ -16,6 +16,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import org.hibernate.annotations.BatchSize;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -75,10 +76,12 @@ public class CustomerOrder {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
+    @BatchSize(size = 50)
     private List<OrderItem> items = new ArrayList<>();
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.PERSIST)
     @OrderBy("id ASC")
+    @BatchSize(size = 50)
     private List<OrderStatusHistory> history = new ArrayList<>();
 
     protected CustomerOrder() {
@@ -170,6 +173,15 @@ public class CustomerOrder {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    /** Changes every time the order is saved with a change. Used to refuse actions based on a stale screen. */
+    public long getVersion() {
+        return version;
     }
 
     public List<OrderItem> getItems() {

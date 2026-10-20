@@ -386,3 +386,41 @@ h1, h2, h3, h4, h5, .navbar-brand { font-family: var(--font-head); }
     .cart-line > form, .cart-line-total { grid-column: 2; }
     .cart-line-total { text-align: left; }
 }
+
+/* ---------- Staff order board ---------- */
+.board { max-width: 1400px; margin: 0 auto; padding: 22px 20px 48px; }
+.board-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.board-head h1 { margin: 0; font: 800 28px/1.15 var(--font-head); }
+.board-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.board-tab {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line);
+    border-radius: 999px; background: var(--paper); color: var(--brown); font: 700 13px/1 var(--font-body); text-decoration: none;
+}
+.board-tab:hover { border-color: var(--orange); color: var(--brown); }
+.board-tab.is-active { border-color: var(--orange); background: var(--orange); color: #fff; }
+.board-count { min-width: 22px; padding: 3px 6px; border-radius: 999px; background: var(--cream-deep); color: var(--brown); font-size: 12px; text-align: center; }
+.board-tab.is-active .board-count { background: #fff; color: var(--orange-dark); }
+.board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; align-items: start; }
+.ticket {
+    display: grid; gap: 8px; padding: 16px; border: 1px solid var(--line); border-top: 5px solid var(--line);
+    border-radius: 12px; background: var(--paper);
+}
+.ticket-submitted { border-top-color: #e0a526; }
+.ticket-accepted { border-top-color: #3b6fd6; }
+.ticket-preparing { border-top-color: var(--orange); }
+.ticket-ready { border-top-color: var(--green); }
+.ticket-completed { border-top-color: #8b7b6b; }
+.ticket-cancelled { border-top-color: #b4321f; }
+.ticket-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ticket-number { font: 800 17px/1.2 var(--font-head); }
+.ticket-table { font: 800 30px/1.1 var(--font-head); }
+.ticket-time { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; }
+.ticket-wait { font-weight: 700; }
+.ticket-lines { margin: 4px 0; padding: 10px 12px; border-radius: 8px; background: var(--cream-deep); list-style: none; font: 600 16px/1.6 var(--font-body); }
+.ticket-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 14px; }
+.ticket-foot strong { color: var(--brown); font: 800 16px/1 var(--font-head); }
+.ticket-note { margin: 0; color: #7a1f12; font-size: 14px; font-weight: 600; }
+.ticket-action { margin: 4px 0 0; }
+.ticket-action .btn { min-height: 48px; font-size: 16px; }
+.ticket-cancel summary { cursor: pointer; color: #7a1f12; font-size: 14px; font-weight: 700; }
+.ticket-cancel form { margin-top: 8px; }

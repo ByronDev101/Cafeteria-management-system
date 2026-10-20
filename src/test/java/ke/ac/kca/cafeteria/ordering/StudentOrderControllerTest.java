@@ -248,4 +248,17 @@ class StudentOrderControllerTest {
     void cancellingNeedsACsrfToken() throws Exception {
         mvc.perform(post("/student/orders/o1/cancel")).andExpect(status().isForbidden());
     }
+
+    @Test
+    @WithMockUser(username = "amina", roles = "STUDENT")
+    void aCancelledOrderShowsWhoCancelledItAndWhy() throws Exception {
+        OrderView cancelled = new OrderView("o3", "SC-ZZZ999", "CANCELLED", "Cancelled", true, false, "Table 7", "Cash",
+                "KSh 50.00", "1 Jan 2026, 12:00",
+                List.of(new OrderLineView("Tea", 1, "KSh 50.00", "KSh 50.00")),
+                List.of(new OrderStepView("Submitted", "done", "1 Jan 2026, 12:00"),
+                        new OrderStepView("Cancelled", "cancelled", "1 Jan 2026, 12:10")),
+                "Cancelled by staff: Out of stock");
+        when(orders.detail("amina", "o3")).thenReturn(cancelled);
+        mvc.perform(get("/student/orders/o3")).andExpect(status().isOk());
+    }
 }
