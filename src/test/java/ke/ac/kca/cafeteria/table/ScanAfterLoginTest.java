@@ -66,4 +66,11 @@ class ScanAfterLoginTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"));
     }
+
+    @Test
+    void aStaleSignInFormSendsThePersonBackWithAMessageInsteadOfAnErrorPage() throws Exception {
+        mvc.perform(post("/login").param("username", "amina").param("password", "Sunny-Day-42"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?expired"));
+    }
 }

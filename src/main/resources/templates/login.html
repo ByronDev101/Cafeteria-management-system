@@ -23,6 +23,9 @@
         <div th:if="${param.logout}" class="alert alert-success" role="status">
             You have signed out.
         </div>
+        <div th:if="${param.expired}" class="alert alert-warning" role="status">
+            Your sign-in page had expired. Please sign in again.
+        </div>
         <div th:if="${param.changed}" class="alert alert-success" role="status">
             Your password has been changed. Sign in with your new password.
         </div>
