@@ -40,9 +40,9 @@ class StaffOrderControllerTest {
 
     @BeforeEach
     void stubBoard() {
-        QueueOrder fresh = new QueueOrder("o1", "SC-ABC123", "SUBMITTED", "Submitted", "Table 7", "12:05", "3 min ago",
+        QueueOrder fresh = new QueueOrder("o1", "SC-ABC123", "SUBMITTED", "Submitted", "Table 7", "Amina Wanjiru", "12:05", "3 min ago",
                 List.of("2 x Tea", "1 x Samosa"), "KSh 130.00", "Cash", 4L, "ACCEPTED", "Accept order", true, null);
-        QueueOrder cancelled = new QueueOrder("o2", "SC-DEF456", "CANCELLED", "Cancelled", "Table 2", "11:00",
+        QueueOrder cancelled = new QueueOrder("o2", "SC-DEF456", "CANCELLED", "Cancelled", "Table 2", "Brian Otieno", "11:00",
                 "1 h 5 min ago", List.of("1 x Tea"), "KSh 50.00", "M-Pesa till", 2L, null, null, false,
                 "Cancelled by staff: Out of stock");
         when(processing.queue(any(QueueFilter.class))).thenReturn(List.of(fresh, cancelled));

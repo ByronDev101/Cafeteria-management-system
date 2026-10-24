@@ -8,7 +8,10 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 
 /**
@@ -28,6 +31,7 @@ public class SecurityConfig {
 
         http
             .requestCache(cache -> cache.requestCache(requestCache))
+            .exceptionHandling(handling -> handling.accessDeniedHandler(accessDeniedHandler()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/actuator/health").permitAll()
                 .requestMatchers("/webjars/**", "/css/**", "/js/**", "/fonts/**", "/error").permitAll()
@@ -38,7 +42,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated())
             .formLogin(form -> form
                 .loginPage("/login")
-                .defaultSuccessUrl("/", false)
+                .successHandler(new RoleAwareSuccessHandler(requestCache))
                 .permitAll())
             .logout(logout -> logout
                 .logoutSuccessUrl("/login?logout")
@@ -50,6 +54,23 @@ public class SecurityConfig {
                     + "frame-ancestors 'none'; form-action 'self'")))
             .addFilterAfter(new MustChangePasswordFilter(), AnonymousAuthenticationFilter.class);
         return http.build();
+    }
+
+    /**
+     * A sign-in form that went stale (for example the app was restarted while the page stayed open) fails the CSRF
+     * check. Instead of an "access denied" page, send the person back to sign in with a short explanation.
+     * Every other refusal keeps the normal 403 page, and every other form still needs a valid token.
+     */
+    private static AccessDeniedHandler accessDeniedHandler() {
+        AccessDeniedHandlerImpl standard = new AccessDeniedHandlerImpl();
+        return (request, response, exception) -> {
+            String path = request.getRequestURI().substring(request.getContextPath().length());
+            if (exception instanceof CsrfException && "/login".equals(path)) {
+                response.sendRedirect(request.getContextPath() + "/login?expired");
+            } else {
+                standard.handle(request, response, exception);
+            }
+        };
     }
 
     /** BCrypt per NFR-02 (SDS allows Argon2id where supported). */

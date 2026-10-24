@@ -86,7 +86,7 @@ class OrderProcessingServiceTest {
     // ---- the board ----
 
     @Test
-    void theBoardShowsOnlyWhatIsNeededToServeAnOrder() {
+    void theBoardShowsWhatIsNeededToServeAnOrderAndTheStudentsDisplayName() {
         CustomerOrder order = newOrder();
         when(orders.findByStatusCodeInOrderByCreatedAtAsc(eq(List.of("SUBMITTED", "ACCEPTED", "PREPARING", "READY")),
                 any(Pageable.class))).thenReturn(List.of(order));
@@ -95,6 +95,7 @@ class OrderProcessingServiceTest {
 
         assertEquals("SC-ABC123", q.getOrderNumber());
         assertEquals("Table 7", q.getTableLabel());
+        assertEquals("Amina Wanjiru", q.getStudentName());
         assertEquals(List.of("2 x Tea", "1 x Samosa"), q.getLines());
         assertEquals("Cash", q.getPaymentLabel());
         assertEquals("KSh 130.00", q.getTotalText());
@@ -106,8 +107,9 @@ class OrderProcessingServiceTest {
 
         for (Method method : QueueOrder.class.getMethods()) {
             String name = method.getName().toLowerCase();
-            assertFalse(name.contains("student") || name.contains("user") || name.contains("account"),
-                    "the board must not expose who the student is: " + method.getName());
+            assertFalse(name.contains("username") || name.contains("email") || name.contains("account")
+                            || name.contains("password"),
+                    "the board shows the display name only, never login details: " + method.getName());
         }
     }
 

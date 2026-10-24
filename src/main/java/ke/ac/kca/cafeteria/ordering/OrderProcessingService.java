@@ -164,7 +164,7 @@ public class OrderProcessingService {
                 .toList();
         OrderStatus next = forwardStep(status);
         return new QueueOrder(order.getPublicId(), order.getOrderNumber(), status.name(), status.getLabel(),
-                order.getTableLabel(), timeFormat.format(order.getCreatedAt()),
+                order.getTableLabel(), order.getStudent().getDisplayName(), timeFormat.format(order.getCreatedAt()),
                 waitText(order.getCreatedAt(), now), lines, PriceParser.format(order.getTotal()),
                 order.getPaymentMethod().getLabel(), order.getVersion(),
                 next == null ? null : next.name(), next == null ? null : actionLabel(next),

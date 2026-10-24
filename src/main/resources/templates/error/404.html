@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Page not found - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="auth-body">
+<main class="auth-card">
+    <div class="auth-brand">
+        <span class="brand-mark" aria-hidden="true">SC</span>
+        <span class="brand-copy"><span>Smart</span><strong>Cafeteria</strong></span>
+    </div>
+    <div class="auth-form">
+        <h1>Page not found</h1>
+        <p class="text-secondary mb-4">We could not find that page. Check the address, or go back to the start.</p>
+        <a class="btn btn-primary" th:href="@{/}">Back to start</a>
+    </div>
+</main>
+</body>
+</html>

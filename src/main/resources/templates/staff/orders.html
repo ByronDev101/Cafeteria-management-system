@@ -40,6 +40,7 @@
                 <span class="status-pill" th:classappend="'status-' + ${o.statusClass}" th:text="${o.statusLabel}">Submitted</span>
             </header>
             <div class="ticket-table" th:text="${o.tableLabel}">Table 7</div>
+            <div class="ticket-student" th:text="${o.studentName}">Amina Wanjiru</div>
             <div class="ticket-time">
                 <span th:text="${o.createdText}">12:05</span>
                 <span class="ticket-wait" th:text="${o.waitText}">7 min ago</span>
