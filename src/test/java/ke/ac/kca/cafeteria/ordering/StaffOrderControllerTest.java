@@ -10,12 +10,19 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ke.ac.kca.cafeteria.config.SecurityConfig;
+import ke.ac.kca.cafeteria.finance.PaymentRecord;
+import ke.ac.kca.cafeteria.finance.PaymentResult;
+import ke.ac.kca.cafeteria.finance.PaymentService;
+import ke.ac.kca.cafeteria.finance.PaymentStatus;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +44,9 @@ class StaffOrderControllerTest {
 
     @MockitoBean
     OrderProcessingService processing;
+
+    @MockitoBean
+    PaymentService payments;
 
     @BeforeEach
     void stubBoard() {
@@ -153,6 +163,176 @@ class StaffOrderControllerTest {
     void changesNeedACsrfToken() throws Exception {
         mvc.perform(post("/staff/orders/o1/transition").param("to", "ACCEPTED").param("version", "4"))
            .andExpect(status().isForbidden());
+    }
+
+    // ---- payments ----
+
+    private static QueueOrder withPayment(String orderStatus, String statusLabel, String paymentCode, String paymentLabel,
+                                          String reference, boolean canVerify, boolean canRefund, boolean askReference) {
+        return new QueueOrder("o9", "SC-PAY999", orderStatus, statusLabel, "Table 4", "Amina Wanjiru", "12:05",
+                "3 min ago", List.of("1 x Tea"), "KSh 50.00", "M-Pesa till", 1L, null, null, false, null,
+                paymentCode, paymentLabel, reference, canVerify, canRefund, askReference);
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void staffMarkAPaymentReceivedAsThemselvesAndKeepTheView() throws Exception {
+        when(payments.verify("sam", "o1", "SJK3H2L9PQ"))
+                .thenReturn(new PaymentResult("SC-ABC123", PaymentStatus.VERIFIED));
+
+        mvc.perform(post("/staff/orders/o1/payment/verify").with(csrf())
+                .param("reference", "SJK3H2L9PQ").param("filter", "NEW").param("actor", "someone-else"))
+           .andExpect(status().is3xxRedirection())
+           .andExpect(redirectedUrl("/staff/orders?filter=NEW"))
+           .andExpect(flash().attributeExists("message"));
+
+        verify(payments).verify("sam", "o1", "SJK3H2L9PQ");
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void theReferenceIsOptional() throws Exception {
+        when(payments.verify(anyString(), anyString(), any()))
+                .thenReturn(new PaymentResult("SC-ABC123", PaymentStatus.VERIFIED));
+
+        mvc.perform(post("/staff/orders/o1/payment/verify").with(csrf()))
+           .andExpect(redirectedUrl("/staff/orders?filter=ACTIVE"))
+           .andExpect(flash().attributeExists("message"));
+
+        verify(payments).verify("sam", "o1", null);
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void aRefusedPaymentStepExplainsWhy() throws Exception {
+        when(payments.verify(any(), any(), any()))
+                .thenThrow(new OrderException("The payment for order SC-ABC123 was already marked as received."));
+
+        mvc.perform(post("/staff/orders/o1/payment/verify").with(csrf()))
+           .andExpect(status().is3xxRedirection())
+           .andExpect(flash().attributeExists("errors"));
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void twoPeopleChangingAPaymentAtTheSameMomentIsExplained() throws Exception {
+        doThrow(new ObjectOptimisticLockingFailureException(PaymentRecord.class, 1L))
+                .when(payments).verify(any(), any(), any());
+        doThrow(new ObjectOptimisticLockingFailureException(PaymentRecord.class, 1L))
+                .when(payments).markRefunded(any(), any());
+
+        mvc.perform(post("/staff/orders/o1/payment/verify").with(csrf()))
+           .andExpect(flash().attributeExists("errors"));
+        mvc.perform(post("/staff/orders/o1/payment/refunded").with(csrf()))
+           .andExpect(flash().attributeExists("errors"));
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void staffMarkARefundPaidAsThemselves() throws Exception {
+        when(payments.markRefunded("sam", "o2")).thenReturn(new PaymentResult("SC-DEF456", PaymentStatus.REFUNDED));
+
+        mvc.perform(post("/staff/orders/o2/payment/refunded").with(csrf()).param("filter", "REFUNDS"))
+           .andExpect(status().is3xxRedirection())
+           .andExpect(redirectedUrl("/staff/orders?filter=REFUNDS"))
+           .andExpect(flash().attributeExists("message"));
+
+        verify(payments).markRefunded("sam", "o2");
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void aRefusedRefundStepExplainsWhy() throws Exception {
+        when(payments.markRefunded(any(), any())).thenThrow(new OrderException("Order SC-DEF456 has no refund due."));
+
+        mvc.perform(post("/staff/orders/o2/payment/refunded").with(csrf()))
+           .andExpect(flash().attributeExists("errors"));
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void managersCanRecordPaymentsToo() throws Exception {
+        when(payments.verify(any(), any(), any())).thenReturn(new PaymentResult("SC-ABC123", PaymentStatus.VERIFIED));
+        mvc.perform(post("/staff/orders/o1/payment/verify").with(csrf()))
+           .andExpect(flash().attributeExists("message"));
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void studentsCannotRecordPayments() throws Exception {
+        mvc.perform(post("/staff/orders/o1/payment/verify").with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post("/staff/orders/o1/payment/refunded").with(csrf())).andExpect(status().isForbidden());
+        verify(payments, never()).verify(any(), any(), any());
+        verify(payments, never()).markRefunded(any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void administratorsCannotRecordPayments() throws Exception {
+        mvc.perform(post("/staff/orders/o1/payment/verify").with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post("/staff/orders/o1/payment/refunded").with(csrf())).andExpect(status().isForbidden());
+        verify(payments, never()).verify(any(), any(), any());
+        verify(payments, never()).markRefunded(any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "STAFF")
+    void paymentChangesNeedACsrfToken() throws Exception {
+        mvc.perform(post("/staff/orders/o1/payment/verify")).andExpect(status().isForbidden());
+        mvc.perform(post("/staff/orders/o1/payment/refunded")).andExpect(status().isForbidden());
+        verify(payments, never()).verify(any(), any(), any());
+        verify(payments, never()).markRefunded(any(), any());
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void anAwaitedPaymentShowsItsStatusAndTheReceivedButton() throws Exception {
+        when(processing.queue(any(QueueFilter.class))).thenReturn(List.of(
+                withPayment("SUBMITTED", "Submitted", "PENDING", "Awaiting payment", null, true, false, true)));
+
+        mvc.perform(get("/staff/orders"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Awaiting payment")))
+           .andExpect(content().string(containsString("Mark payment received")))
+           .andExpect(content().string(containsString("M-Pesa code (optional)")))
+           .andExpect(content().string(not(containsString("Mark refund paid"))));
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void aReceivedPaymentShowsItsReferenceAndNoPaymentButtons() throws Exception {
+        when(processing.queue(any(QueueFilter.class))).thenReturn(List.of(
+                withPayment("COMPLETED", "Completed", "VERIFIED", "Payment received", "SJK3H2L9PQ", false, false, true)));
+
+        mvc.perform(get("/staff/orders").param("filter", "DONE_TODAY"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Payment received")))
+           .andExpect(content().string(containsString("Ref SJK3H2L9PQ")))
+           .andExpect(content().string(not(containsString("Mark payment received"))))
+           .andExpect(content().string(not(containsString("Mark refund paid"))));
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void aRefundDueShowsTheRefundPaidButton() throws Exception {
+        when(processing.queue(any(QueueFilter.class))).thenReturn(List.of(
+                withPayment("CANCELLED", "Cancelled", "REFUND_DUE", "Refund due", "SJK3H2L9PQ", false, true, true)));
+
+        mvc.perform(get("/staff/orders").param("filter", "REFUNDS"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Refund due")))
+           .andExpect(content().string(containsString("Mark refund paid")))
+           .andExpect(content().string(not(containsString("Mark payment received"))));
+    }
+
+    @Test
+    @WithMockUser(username = "sam", roles = "STAFF")
+    void theRefundsViewSaysPlainlyWhenNothingIsWaiting() throws Exception {
+        when(processing.queue(any(QueueFilter.class))).thenReturn(List.of());
+
+        mvc.perform(get("/staff/orders").param("filter", "REFUNDS"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("No refunds are waiting to be handed back.")));
     }
 
     @Test

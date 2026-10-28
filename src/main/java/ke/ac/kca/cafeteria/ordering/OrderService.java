@@ -1,5 +1,7 @@
 package ke.ac.kca.cafeteria.ordering;
 
+import ke.ac.kca.cafeteria.finance.PaymentService;
+import ke.ac.kca.cafeteria.finance.PaymentView;
 import ke.ac.kca.cafeteria.identity.AppUser;
 import ke.ac.kca.cafeteria.identity.UserRepository;
 import ke.ac.kca.cafeteria.menu.MenuService;
@@ -47,16 +49,18 @@ public class OrderService {
     private final TableService tables;
     private final MenuService menu;
     private final AuditService audit;
+    private final PaymentService payments;
     private final DateTimeFormatter timeFormat;
 
     public OrderService(CustomerOrderRepository orders, UserRepository users, TableService tables,
-                        MenuService menu, AuditService audit,
+                        MenuService menu, AuditService audit, PaymentService payments,
                         @Value("${app.display-timezone:Africa/Nairobi}") String zoneId) {
         this.orders = orders;
         this.users = users;
         this.tables = tables;
         this.menu = menu;
         this.audit = audit;
+        this.payments = payments;
         this.timeFormat = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneId.of(zoneId));
     }
 
@@ -118,6 +122,7 @@ public class OrderService {
             order.addItem(item.id(), item.name(), item.unitPrice(), line.getValue());
         }
         orders.save(order);
+        payments.openFor(order);
 
         audit.record(student.getUsername(), PLACED, TARGET, order.getPublicId(), SUCCESS,
                 "number=" + order.getOrderNumber() + "; table=" + order.getTableLabel()
@@ -169,8 +174,9 @@ public class OrderService {
             throw new OrderException("This order can no longer be cancelled here because it has been "
                     + order.getStatus().getLabel().toLowerCase() + ". Please ask a member of staff.");
         }
-        // Sprint 5: when cafeteria credit is offered, release any credit held for this order here.
+        // Slice B: when cafeteria credit is offered, release any credit held for this order here.
         order.moveTo(OrderStatus.CANCELLED, order.getStudent().getUsername(), "Cancelled by the student");
+        payments.settleOnCancellation(order.getStudent().getUsername(), order);
         audit.record(order.getStudent().getUsername(), CANCELLED, TARGET, order.getPublicId(), SUCCESS,
                 "number=" + order.getOrderNumber() + "; by the student");
     }
@@ -208,6 +214,7 @@ public class OrderService {
 
     private OrderView view(CustomerOrder order) {
         OrderStatus current = order.getStatus();
+        PaymentView payment = payments.viewFor(order);
         List<OrderLineView> lines = order.getItems().stream()
                 .map(item -> new OrderLineView(item.getItemName(), item.getQuantity(),
                         PriceParser.format(item.getUnitPrice()), PriceParser.format(item.getLineTotal())))
@@ -215,7 +222,9 @@ public class OrderService {
         return new OrderView(order.getPublicId(), order.getOrderNumber(), current.name(), current.getLabel(),
                 current.isTerminal(), current.studentMayCancel(), order.getTableLabel(),
                 order.getPaymentMethod().getLabel(), PriceParser.format(order.getTotal()),
-                timeFormat.format(order.getCreatedAt()), lines, steps(order, current), cancelNote(order, current));
+                timeFormat.format(order.getCreatedAt()), lines, steps(order, current), cancelNote(order, current),
+                payment == null ? null : payment.getStatusCode(), payment == null ? null : payment.getStatusLabel(),
+                payment == null ? null : payment.getStudentNote());
     }
 
     /** For a cancelled order: who cancelled it and why, worded for the student. */

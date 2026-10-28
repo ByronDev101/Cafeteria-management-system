@@ -6,6 +6,7 @@
     <title>Order board - Smart Cafeteria</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/finance.css}">
     <script th:src="@{/js/staff-board.js}" defer></script>
 </head>
 <body>
@@ -30,7 +31,8 @@
 
     <p class="empty-note" th:if="${#lists.isEmpty(orders)}">
         <span th:if="${filter.finishedView}">No orders have finished today.</span>
-        <span th:unless="${filter.finishedView}">No orders waiting here right now. New orders appear by themselves.</span>
+        <span th:if="${filter.refundView}">No refunds are waiting to be handed back.</span>
+        <span th:unless="${filter.finishedView or filter.refundView}">No orders waiting here right now. New orders appear by themselves.</span>
     </p>
 
     <div class="board-grid">
@@ -53,6 +55,26 @@
                 <strong th:text="${o.totalText}">KSh 0.00</strong>
             </div>
             <p class="ticket-note" th:if="${o.cancelNote}" th:text="${o.cancelNote}">Cancelled by staff: out of stock</p>
+
+            <div class="ticket-pay" th:if="${o.paymentStatusLabel}">
+                <span class="pay-pill" th:classappend="'pay-' + ${o.paymentStatusClass}" th:text="${o.paymentStatusLabel}">Awaiting payment</span>
+                <span class="ticket-ref" th:if="${o.paymentReference}" th:text="'Ref ' + ${o.paymentReference}">Ref SJK3H2L9PQ</span>
+            </div>
+
+            <form class="ticket-pay-action" method="post" th:if="${o.canVerifyPayment}"
+                  th:action="@{/staff/orders/{id}/payment/verify(id=${o.publicId})}">
+                <input type="hidden" name="filter" th:value="${filter.code}">
+                <label class="visually-hidden" th:if="${o.askPaymentReference}" th:for="'ref-' + ${o.publicId}">M-Pesa code (optional)</label>
+                <input class="form-control form-control-sm mb-2" type="text" name="reference" th:if="${o.askPaymentReference}"
+                       maxlength="40" autocomplete="off" th:id="'ref-' + ${o.publicId}" placeholder="M-Pesa code (optional)">
+                <button type="submit" class="btn btn-outline-primary w-100">Mark payment received</button>
+            </form>
+
+            <form class="ticket-pay-action" method="post" th:if="${o.canMarkRefunded}"
+                  th:action="@{/staff/orders/{id}/payment/refunded(id=${o.publicId})}">
+                <input type="hidden" name="filter" th:value="${filter.code}">
+                <button type="submit" class="btn btn-outline-primary w-100">Mark refund paid</button>
+            </form>
 
             <form class="ticket-action" method="post" th:if="${o.nextStatusCode}"
                   th:action="@{/staff/orders/{id}/transition(id=${o.publicId})}">

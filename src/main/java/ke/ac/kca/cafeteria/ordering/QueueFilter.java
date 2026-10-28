@@ -10,7 +10,9 @@ public enum QueueFilter {
     NEW("New", List.of(OrderStatus.SUBMITTED)),
     KITCHEN("In the kitchen", List.of(OrderStatus.ACCEPTED, OrderStatus.PREPARING)),
     READY("Ready to serve", List.of(OrderStatus.READY)),
-    DONE_TODAY("Finished today", List.of(OrderStatus.COMPLETED, OrderStatus.CANCELLED));
+    DONE_TODAY("Finished today", List.of(OrderStatus.COMPLETED, OrderStatus.CANCELLED)),
+    /** Cancelled orders whose payment was received and now has to be handed back, whatever day they were cancelled. */
+    REFUNDS("Refunds due", List.of());
 
     private final String label;
     private final List<OrderStatus> statuses;
@@ -39,6 +41,11 @@ public enum QueueFilter {
     /** True for the view that lists finished orders, which are limited to today. */
     public boolean isFinishedView() {
         return this == DONE_TODAY;
+    }
+
+    /** True for the view of refunds still to be handed back. It is chosen by payment status, not by order status. */
+    public boolean isRefundView() {
+        return this == REFUNDS;
     }
 
     /** Anything unrecognised falls back to the all-active view. */
