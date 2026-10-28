@@ -30,12 +30,23 @@ public final class PaymentView {
 
     public static PaymentView of(PaymentRecord record) {
         PaymentStatus status = record.getStatus();
+        PaymentMethod method = record.getPaymentMethod();
+        boolean credit = method == PaymentMethod.CREDIT;
+        // A credit order is charged by the ledger when staff accept it, so staff never mark it received by hand.
         return new PaymentView(status.name(), status.getLabel(), record.getReference(),
-                status == PaymentStatus.PENDING, status == PaymentStatus.REFUND_DUE,
-                record.getPaymentMethod() == PaymentMethod.MPESA_TILL, studentNote(status));
+                status == PaymentStatus.PENDING && !credit, status == PaymentStatus.REFUND_DUE,
+                method == PaymentMethod.MPESA_TILL, studentNote(status, credit));
     }
 
-    private static String studentNote(PaymentStatus status) {
+    private static String studentNote(PaymentStatus status, boolean credit) {
+        if (credit) {
+            return switch (status) {
+                case PENDING -> "Your credit is held for this order. It is charged when staff accept it.";
+                case VERIFIED -> "This order was charged to your cafeteria credit.";
+                case VOIDED -> "Nothing was charged. The credit held for this order was released.";
+                case REFUND_DUE, REFUNDED -> "The charge for this order was cancelled and your credit was restored.";
+            };
+        }
         return switch (status) {
             case PENDING -> "Staff write down your payment when they receive it.";
             case VERIFIED -> "Staff have written down your payment as received.";

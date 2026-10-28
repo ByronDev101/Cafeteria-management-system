@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My credit - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/finance.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/topbar :: bar('/student/menu', ${welcome}, ${today})}"/>
+<main class="page-narrow">
+    <h1>My credit</h1>
+    <p class="text-secondary">
+        Cafeteria credit lets you order now and settle later, up to a limit set by the cafeteria manager.
+        These are prototype records. No real money moves through this system.
+    </p>
+
+    <p class="empty-note" th:unless="${balance.hasAccount}">
+        You do not have cafeteria credit yet. Ask the cafeteria manager if you would like a credit limit.
+    </p>
+
+    <div class="credit-grid mb-4" th:if="${balance.hasAccount}">
+        <div class="credit-figure">
+            <span class="report-label">Available now</span>
+            <span class="report-figure" th:text="${balance.availableText}">KSh 0.00</span>
+        </div>
+        <div class="credit-figure">
+            <span class="report-label">Your limit</span>
+            <span class="report-figure" th:text="${balance.limitText}">KSh 0.00</span>
+        </div>
+        <div class="credit-figure">
+            <span class="report-label">Held for orders</span>
+            <span class="report-figure" th:text="${balance.heldText}">KSh 0.00</span>
+        </div>
+        <div class="credit-figure">
+            <span class="report-label">You owe</span>
+            <span class="report-figure" th:text="${balance.owedText}">KSh 0.00</span>
+        </div>
+    </div>
+    <p class="small text-secondary" th:if="${balance.hasAccount}">
+        Credit is held when you place an order and charged when staff accept it. If the order is cancelled, it is
+        released or reversed. What you owe is paid at the cafeteria, and a manager records the payment.
+    </p>
+
+    <h2 class="h5">Recent activity</h2>
+    <p class="empty-note" th:if="${#lists.isEmpty(entries)}">Nothing yet.</p>
+    <ul class="list-group mb-4" th:unless="${#lists.isEmpty(entries)}">
+        <li class="list-group-item d-flex justify-content-between align-items-start gap-3" th:each="e : ${entries}">
+            <div>
+                <strong th:text="${e.typeLabel}">Held for an order</strong>
+                <span class="d-block small text-secondary">
+                    <span th:if="${e.orderNumber}" th:text="${e.orderNumber} + ' - '">SC-ABC123 - </span><span th:text="${e.createdText}">1 Jan 2026, 12:00</span>
+                </span>
+                <span class="d-block small text-secondary" th:if="${e.note}" th:text="${e.note}">Paid at the till</span>
+            </div>
+            <span class="text-nowrap fw-bold" th:text="${e.amountText}">KSh 0.00</span>
+        </li>
+    </ul>
+    <p><a th:href="@{/student/orders}">My orders</a> &middot; <a th:href="@{/student/menu}">Back to the menu</a></p>
+</main>
+</body>
+</html>

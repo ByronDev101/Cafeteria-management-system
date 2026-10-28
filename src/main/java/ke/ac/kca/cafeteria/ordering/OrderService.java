@@ -1,5 +1,6 @@
 package ke.ac.kca.cafeteria.ordering;
 
+import ke.ac.kca.cafeteria.credit.CreditService;
 import ke.ac.kca.cafeteria.finance.PaymentService;
 import ke.ac.kca.cafeteria.finance.PaymentView;
 import ke.ac.kca.cafeteria.identity.AppUser;
@@ -50,10 +51,11 @@ public class OrderService {
     private final MenuService menu;
     private final AuditService audit;
     private final PaymentService payments;
+    private final CreditService credit;
     private final DateTimeFormatter timeFormat;
 
     public OrderService(CustomerOrderRepository orders, UserRepository users, TableService tables,
-                        MenuService menu, AuditService audit, PaymentService payments,
+                        MenuService menu, AuditService audit, PaymentService payments, CreditService credit,
                         @Value("${app.display-timezone:Africa/Nairobi}") String zoneId) {
         this.orders = orders;
         this.users = users;
@@ -61,6 +63,7 @@ public class OrderService {
         this.menu = menu;
         this.audit = audit;
         this.payments = payments;
+        this.credit = credit;
         this.timeFormat = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneId.of(zoneId));
     }
 
@@ -81,7 +84,7 @@ public class OrderService {
         }
 
         List<String> problems = new ArrayList<>();
-        if (method == null || !PaymentMethod.offered().contains(method)) {
+        if (method == null || !(method == PaymentMethod.CREDIT || PaymentMethod.offered().contains(method))) {
             problems.add("Choose how you will pay.");
         }
         if (lines == null || lines.isEmpty()) {
@@ -123,6 +126,10 @@ public class OrderService {
         }
         orders.save(order);
         payments.openFor(order);
+        if (method == PaymentMethod.CREDIT) {
+            // Refuses (and so cancels this whole order) if the student has no credit or the total is over what is left.
+            credit.reserve(order);
+        }
 
         audit.record(student.getUsername(), PLACED, TARGET, order.getPublicId(), SUCCESS,
                 "number=" + order.getOrderNumber() + "; table=" + order.getTableLabel()
@@ -174,8 +181,8 @@ public class OrderService {
             throw new OrderException("This order can no longer be cancelled here because it has been "
                     + order.getStatus().getLabel().toLowerCase() + ". Please ask a member of staff.");
         }
-        // Slice B: when cafeteria credit is offered, release any credit held for this order here.
         order.moveTo(OrderStatus.CANCELLED, order.getStudent().getUsername(), "Cancelled by the student");
+        credit.releaseOnCancellation(order.getStudent().getUsername(), order);
         payments.settleOnCancellation(order.getStudent().getUsername(), order);
         audit.record(order.getStudent().getUsername(), CANCELLED, TARGET, order.getPublicId(), SUCCESS,
                 "number=" + order.getOrderNumber() + "; by the student");

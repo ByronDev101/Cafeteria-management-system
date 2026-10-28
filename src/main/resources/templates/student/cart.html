@@ -72,6 +72,8 @@
                 <label class="form-check-label" th:for="'pay-' + ${m.code}">
                     <strong th:text="${m.label}">Cash</strong>
                     <span class="d-block text-secondary small" th:text="${m.hint}">Hint</span>
+                    <span class="d-block small fw-bold" th:if="${creditAvailable != null and m.code == 'CREDIT'}"
+                          th:text="'Available now: ' + ${creditAvailable}">Available now: KSh 500.00</span>
                 </label>
             </div>
         </fieldset>

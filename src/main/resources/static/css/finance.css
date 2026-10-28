@@ -26,3 +26,8 @@
 .report-figure { font: 800 24px/1.1 var(--font-head); color: var(--brown); }
 .report-label { color: var(--muted); font-size: 13px; font-weight: 700; }
 .report-count { color: var(--muted); font-size: 13px; }
+
+/* credit pages (Sprint 5, slice B) */
+.credit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.credit-figure { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px; background: var(--cream-deep); }
+@media (min-width: 768px) { .credit-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

@@ -9,11 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ke.ac.kca.cafeteria.credit.CreditService;
 import ke.ac.kca.cafeteria.finance.PaymentService;
 import ke.ac.kca.cafeteria.finance.PaymentView;
 import ke.ac.kca.cafeteria.identity.AppUser;
@@ -28,6 +31,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -40,6 +44,7 @@ class OrderProcessingServiceTest {
     private CustomerOrderRepository orders;
     private AuditService audit;
     private PaymentService payments;
+    private CreditService credit;
     private OrderProcessingService service;
     private AppUser amina;
 
@@ -48,7 +53,8 @@ class OrderProcessingServiceTest {
         orders = mock(CustomerOrderRepository.class);
         audit = mock(AuditService.class);
         payments = mock(PaymentService.class);
-        service = new OrderProcessingService(orders, audit, payments, "Africa/Nairobi");
+        credit = mock(CreditService.class);
+        service = new OrderProcessingService(orders, audit, payments, credit, "Africa/Nairobi");
         amina = new AppUser("amina", "hash", "Amina Wanjiru");
         signInAs("ROLE_STAFF");
     }
@@ -409,6 +415,66 @@ class OrderProcessingServiceTest {
                 () -> service.transition("sam", finished.getPublicId(), "CANCELLED", "Too late", null));
 
         verify(payments, never()).settleOnCancellation(any(), any());
+    }
+
+    // ---- credit follows the order ----
+
+    @Test
+    void acceptingAnOrderChargesItsCreditAndMarksThePaymentReceivedAsTheStaffMember() {
+        CustomerOrder order = newOrder();
+
+        service.transition("sam", order.getPublicId(), "ACCEPTED", null, 0L);
+
+        assertEquals(OrderStatus.ACCEPTED, order.getStatus());
+        verify(credit).postOnAcceptance("sam", order);
+        verify(payments).receiveByCredit("sam", order);
+        verify(credit, never()).releaseOnCancellation(any(), any());
+    }
+
+    @Test
+    void ifTheCreditCannotBeChargedTheAcceptanceIsRefusedAndExplained() {
+        CustomerOrder order = newOrder();
+        doThrow(new OrderException("No credit is held for order SC-ABC123, so it cannot be accepted."))
+                .when(credit).postOnAcceptance(any(), any());
+
+        OrderException e = assertThrows(OrderException.class,
+                () -> service.transition("sam", order.getPublicId(), "ACCEPTED", null, 0L));
+
+        assertTrue(e.getMessage().contains("cannot be accepted"));
+        verify(payments, never()).receiveByCredit(any(), any());
+    }
+
+    @Test
+    void cancellingReleasesTheCreditBeforeTheEarlySettlingOfThePayment() {
+        CustomerOrder order = newOrder();
+
+        service.transition("sam", order.getPublicId(), "CANCELLED", "Out of stock", 0L);
+
+        InOrder inOrder = inOrder(credit, payments);
+        inOrder.verify(credit).releaseOnCancellation("sam", order);
+        inOrder.verify(payments).settleOnCancellation("sam", order);
+        verify(credit, never()).postOnAcceptance(any(), any());
+    }
+
+    @Test
+    void movesAfterAcceptanceDoNotChargeAgain() {
+        CustomerOrder order = newOrder();
+        service.transition("sam", order.getPublicId(), "ACCEPTED", null, null);
+        for (String step : List.of("PREPARING", "READY", "COMPLETED")) {
+            service.transition("sam", order.getPublicId(), step, null, null);
+        }
+        verify(credit).postOnAcceptance(any(), any());
+        verify(payments).receiveByCredit(any(), any());
+    }
+
+    @Test
+    void aStaleOrIllegalAcceptanceNeverTouchesTheCredit() {
+        CustomerOrder fresh = newOrder();
+        assertThrows(OrderException.class, () -> service.transition("sam", fresh.getPublicId(), "ACCEPTED", null, 9L));
+        CustomerOrder finished = orderIn(OrderStatus.COMPLETED);
+        assertThrows(OrderException.class, () -> service.transition("sam", finished.getPublicId(), "ACCEPTED", null, null));
+        verify(credit, never()).postOnAcceptance(any(), any());
+        verify(payments, never()).receiveByCredit(any(), any());
     }
 
     @Test

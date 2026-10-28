@@ -3,6 +3,7 @@ package ke.ac.kca.cafeteria.finance;
 import ke.ac.kca.cafeteria.ordering.CustomerOrder;
 import ke.ac.kca.cafeteria.ordering.CustomerOrderRepository;
 import ke.ac.kca.cafeteria.ordering.OrderException;
+import ke.ac.kca.cafeteria.ordering.PaymentMethod;
 import ke.ac.kca.cafeteria.ordering.StaffGuard;
 import ke.ac.kca.cafeteria.reporting.AuditService;
 import java.time.Instant;
@@ -87,6 +88,14 @@ public class PaymentService {
             audit.record(actor, VOIDED, TARGET, record.getPublicId(), SUCCESS,
                     "order=" + order.getOrderNumber() + "; " + before + " -> " + record.getStatus()
                             + "; order cancelled before payment; " + PROTOTYPE);
+        } else if (before == PaymentStatus.VERIFIED && record.getPaymentMethod() == PaymentMethod.CREDIT) {
+            // Nobody hands cash back for a credit charge: the ledger reverses it, so the record closes straight away.
+            record.markRefundDue();
+            record.markRefunded();
+            audit.record(actor, REFUNDED, TARGET, record.getPublicId(), SUCCESS,
+                    "order=" + order.getOrderNumber() + "; " + before + " -> " + record.getStatus()
+                            + "; amount=" + record.getAmount().toPlainString()
+                            + "; credit charge reversed in the ledger; " + PROTOTYPE);
         } else if (before == PaymentStatus.VERIFIED) {
             record.markRefundDue();
             audit.record(actor, REFUND_DUE, TARGET, record.getPublicId(), SUCCESS,
@@ -94,6 +103,27 @@ public class PaymentService {
                             + "; amount=" + record.getAmount().toPlainString()
                             + "; order cancelled after payment; " + PROTOTYPE);
         }
+    }
+
+    /**
+     * Called when staff accept an order paid with credit: the credit has just been charged, so the payment record is
+     * marked received. Does nothing for other orders or for a record that is not awaiting payment.
+     */
+    @Transactional
+    public void receiveByCredit(String actor, CustomerOrder order) {
+        if (order.getPaymentMethod() != PaymentMethod.CREDIT) {
+            return;
+        }
+        Optional<PaymentRecord> found = payments.findByOrder_Id(order.getId());
+        if (found.isEmpty() || found.get().getStatus() != PaymentStatus.PENDING) {
+            return;
+        }
+        PaymentRecord record = found.get();
+        record.markReceived(actor, null);
+        audit.record(actor, VERIFIED, TARGET, record.getPublicId(), SUCCESS,
+                "order=" + order.getOrderNumber() + "; PENDING -> " + record.getStatus()
+                        + "; method=" + record.getMethodCode() + "; amount=" + record.getAmount().toPlainString()
+                        + "; charged to cafeteria credit; " + PROTOTYPE);
     }
 
     // ---- staff actions ----
@@ -104,6 +134,10 @@ public class PaymentService {
         StaffGuard.require();
         CustomerOrder order = findOrder(orderPublicId);
         PaymentRecord record = recordFor(order);
+        if (record.getPaymentMethod() == PaymentMethod.CREDIT) {
+            throw new OrderException("Order " + order.getOrderNumber()
+                    + " is paid with cafeteria credit, which is charged automatically when the order is accepted.");
+        }
         String cleanReference = cleanReference(reference);
 
         PaymentStatus before = record.getStatus();

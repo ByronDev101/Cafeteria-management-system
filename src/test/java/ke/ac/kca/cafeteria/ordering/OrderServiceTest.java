@@ -12,11 +12,13 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ke.ac.kca.cafeteria.credit.CreditService;
 import ke.ac.kca.cafeteria.finance.PaymentService;
 import ke.ac.kca.cafeteria.finance.PaymentView;
 import ke.ac.kca.cafeteria.identity.AppUser;
@@ -47,6 +49,7 @@ class OrderServiceTest {
     private MenuService menu;
     private AuditService audit;
     private PaymentService payments;
+    private CreditService credit;
     private OrderService service;
     private AppUser amina;
 
@@ -62,7 +65,8 @@ class OrderServiceTest {
         menu = mock(MenuService.class);
         audit = mock(AuditService.class);
         payments = mock(PaymentService.class);
-        service = new OrderService(orders, users, tables, menu, audit, payments, "Africa/Nairobi");
+        credit = mock(CreditService.class);
+        service = new OrderService(orders, users, tables, menu, audit, payments, credit, "Africa/Nairobi");
 
         amina = new AppUser("amina", "hash", "Amina Wanjiru");
         when(users.findByUsername("amina")).thenReturn(Optional.of(amina));
@@ -152,7 +156,7 @@ class OrderServiceTest {
     }
 
     @Test
-    void anOrderNeedsItemsAnActiveTableAndAnOfferedPaymentMethod() {
+    void anOrderNeedsItemsAnActiveTableAndAChosenPaymentMethod() {
         OrderException empty = assertThrows(OrderException.class,
                 () -> service.place("amina", lines(), "t1", PaymentMethod.CASH, "key-12345678"));
         assertTrue(empty.getMessage().contains("cart is empty"));
@@ -168,8 +172,6 @@ class OrderServiceTest {
 
         assertThrows(OrderException.class,
                 () -> service.place("amina", lines("tea", 1), "t1", null, "key-12345678"));
-        assertThrows(OrderException.class,
-                () -> service.place("amina", lines("tea", 1), "t1", PaymentMethod.CREDIT, "key-12345678"));
         verify(orders, never()).save(any());
     }
 
@@ -392,6 +394,55 @@ class OrderServiceTest {
         assertEquals("pending", view.getPaymentStatusClass());
         assertEquals("Awaiting payment", view.getPaymentStatusLabel());
         assertEquals("Staff write down your payment when they receive it.", view.getPaymentNote());
+    }
+
+    // ---- credit follows the order ----
+
+    @Test
+    void anOrderPaidWithCreditHoldsTheCreditAfterTheOrderIsSaved() {
+        service.place("amina", lines("tea", 2, "samosa", 1), "t1", PaymentMethod.CREDIT, "key-12345678");
+
+        ArgumentCaptor<CustomerOrder> saved = ArgumentCaptor.forClass(CustomerOrder.class);
+        verify(orders).save(saved.capture());
+        ArgumentCaptor<CustomerOrder> held = ArgumentCaptor.forClass(CustomerOrder.class);
+        verify(credit).reserve(held.capture());
+        assertSame(saved.getValue(), held.getValue());
+        assertEquals(PaymentMethod.CREDIT, saved.getValue().getPaymentMethod());
+        verify(payments).openFor(saved.getValue());
+    }
+
+    @Test
+    void whenTheCreditHoldIsRefusedTheStudentSeesWhyAndNoAuditEntryIsWritten() {
+        doThrow(new OrderException("This order costs KSh 130.00 but you have KSh 0.00 of cafeteria credit available."))
+                .when(credit).reserve(any());
+
+        OrderException e = assertThrows(OrderException.class,
+                () -> service.place("amina", lines("tea", 2, "samosa", 1), "t1", PaymentMethod.CREDIT, "key-12345678"));
+
+        assertTrue(e.getMessage().contains("cafeteria credit available"));
+        verify(audit, never()).record(any(), eq("ORDER_PLACED"), any(), any(), any(), any());
+    }
+
+    @Test
+    void cashAndMpesaOrdersNeverTouchTheCreditLedger() {
+        service.place("amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-12345678");
+        service.place("amina", lines("tea", 1), "t1", PaymentMethod.MPESA_TILL, "key-87654321");
+        verify(credit, never()).reserve(any());
+    }
+
+    @Test
+    void cancellingYourOwnOrderReleasesAnyCreditHeldAsTheStudent() {
+        CustomerOrder order = storedOrder();
+        service.cancelOwn("amina", order.getPublicId());
+        verify(credit).releaseOnCancellation("amina", order);
+    }
+
+    @Test
+    void aRefusedCancellationLeavesTheCreditAlone() {
+        CustomerOrder order = storedOrder();
+        order.moveTo(OrderStatus.ACCEPTED, "staff1", null);
+        assertThrows(OrderException.class, () -> service.cancelOwn("amina", order.getPublicId()));
+        verify(credit, never()).releaseOnCancellation(any(), any());
     }
 
     @Test
