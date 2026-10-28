@@ -3,6 +3,8 @@ package ke.ac.kca.cafeteria.ordering;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -15,6 +17,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ke.ac.kca.cafeteria.finance.PaymentService;
+import ke.ac.kca.cafeteria.finance.PaymentView;
 import ke.ac.kca.cafeteria.identity.AppUser;
 import ke.ac.kca.cafeteria.identity.UserRepository;
 import ke.ac.kca.cafeteria.menu.MenuService;
@@ -42,6 +46,7 @@ class OrderServiceTest {
     private TableService tables;
     private MenuService menu;
     private AuditService audit;
+    private PaymentService payments;
     private OrderService service;
     private AppUser amina;
 
@@ -56,7 +61,8 @@ class OrderServiceTest {
         tables = mock(TableService.class);
         menu = mock(MenuService.class);
         audit = mock(AuditService.class);
-        service = new OrderService(orders, users, tables, menu, audit, "Africa/Nairobi");
+        payments = mock(PaymentService.class);
+        service = new OrderService(orders, users, tables, menu, audit, payments, "Africa/Nairobi");
 
         amina = new AppUser("amina", "hash", "Amina Wanjiru");
         when(users.findByUsername("amina")).thenReturn(Optional.of(amina));
@@ -322,5 +328,81 @@ class OrderServiceTest {
         assertEquals(null, service.detail("amina", order.getPublicId()).getCancelNote());
         order.moveTo(OrderStatus.ACCEPTED, "sam", null);
         assertEquals(null, service.detail("amina", order.getPublicId()).getCancelNote());
+    }
+
+    // ---- payments follow the order ----
+
+    @Test
+    void placingAnOrderOpensItsPaymentRecordForTheSavedOrder() {
+        service.place("amina", lines("tea", 2, "samosa", 1), "t1", PaymentMethod.CASH, "key-12345678");
+
+        ArgumentCaptor<CustomerOrder> saved = ArgumentCaptor.forClass(CustomerOrder.class);
+        verify(orders).save(saved.capture());
+        ArgumentCaptor<CustomerOrder> opened = ArgumentCaptor.forClass(CustomerOrder.class);
+        verify(payments).openFor(opened.capture());
+        assertSame(saved.getValue(), opened.getValue());
+    }
+
+    @Test
+    void anOrderThatCannotBePlacedOpensNoPayment() {
+        menuHas(TEA, JUICE);
+        assertThrows(OrderException.class,
+                () -> service.place("amina", lines("tea", 1, "juice", 1), "t1", PaymentMethod.CASH, "key-12345678"));
+        verify(payments, never()).openFor(any());
+    }
+
+    @Test
+    void aRepeatedSubmitOpensNoSecondPayment() {
+        CustomerOrder earlier = storedOrder();
+        when(orders.findByStudent_UsernameAndIdempotencyKey("amina", "key-12345678")).thenReturn(Optional.of(earlier));
+
+        service.place("amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-12345678");
+
+        verify(payments, never()).openFor(any());
+    }
+
+    @Test
+    void cancellingYourOwnOrderSettlesItsPaymentAsTheStudent() {
+        CustomerOrder order = storedOrder();
+        service.cancelOwn("amina", order.getPublicId());
+        verify(payments).settleOnCancellation("amina", order);
+    }
+
+    @Test
+    void aRefusedCancellationLeavesThePaymentAlone() {
+        CustomerOrder order = storedOrder();
+        order.moveTo(OrderStatus.ACCEPTED, "staff1", null);
+
+        assertThrows(OrderException.class, () -> service.cancelOwn("amina", order.getPublicId()));
+        assertThrows(OrderException.class, () -> service.cancelOwn("brian", order.getPublicId()));
+
+        verify(payments, never()).settleOnCancellation(any(), any());
+    }
+
+    @Test
+    void theOrderPageCarriesThePaymentStatusAndNote() {
+        CustomerOrder order = storedOrder();
+        PaymentView pending = new PaymentView("PENDING", "Awaiting payment", null, true, false, false,
+                "Staff write down your payment when they receive it.");
+        when(payments.viewFor(order)).thenReturn(pending);
+
+        OrderView view = service.detail("amina", order.getPublicId());
+
+        assertEquals("PENDING", view.getPaymentStatusCode());
+        assertEquals("pending", view.getPaymentStatusClass());
+        assertEquals("Awaiting payment", view.getPaymentStatusLabel());
+        assertEquals("Staff write down your payment when they receive it.", view.getPaymentNote());
+    }
+
+    @Test
+    void anOrderWithoutAPaymentRecordShowsNoPaymentStatus() {
+        CustomerOrder order = storedOrder();
+
+        OrderView view = service.detail("amina", order.getPublicId());
+
+        assertNull(view.getPaymentStatusCode());
+        assertNull(view.getPaymentStatusLabel());
+        assertNull(view.getPaymentNote());
+        assertEquals("", view.getPaymentStatusClass());
     }
 }

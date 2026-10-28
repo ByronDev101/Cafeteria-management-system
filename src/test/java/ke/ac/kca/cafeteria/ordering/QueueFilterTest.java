@@ -26,6 +26,16 @@ class QueueFilterTest {
     }
 
     @Test
+    void theRefundsViewIsChosenByPaymentStatusNotOrderStatus() {
+        assertTrue(QueueFilter.REFUNDS.isRefundView());
+        assertTrue(QueueFilter.REFUNDS.statusCodes().isEmpty());
+        assertFalse(QueueFilter.REFUNDS.isFinishedView());
+        assertFalse(QueueFilter.ACTIVE.isRefundView());
+        assertFalse(QueueFilter.DONE_TODAY.isRefundView());
+        assertEquals(QueueFilter.REFUNDS, QueueFilter.parse(" refunds "));
+    }
+
+    @Test
     void unknownOrMissingFiltersFallBackToAllActive() {
         assertEquals(QueueFilter.NEW, QueueFilter.parse("new"));
         assertEquals(QueueFilter.DONE_TODAY, QueueFilter.parse(" DONE_TODAY "));

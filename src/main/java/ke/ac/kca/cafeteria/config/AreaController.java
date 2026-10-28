@@ -33,7 +33,7 @@ public class AreaController {
     public String manager(Principal principal, Model model) {
         model.addAttribute("managerLinks", true);
         model.addAttribute("boardLink", true);
-        return area("Manager area", "Manage the menu. Reports arrive in later sprints.", principal, model);
+        return area("Manager area", "Manage the menu and review orders and payments.", principal, model);
     }
 
     @GetMapping("/admin/home")

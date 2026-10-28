@@ -18,6 +18,9 @@ public final class OrderView {
     private final List<OrderLineView> lines;
     private final List<OrderStepView> steps;
     private final String cancelNote;
+    private final String paymentStatusCode;
+    private final String paymentStatusLabel;
+    private final String paymentNote;
 
     public OrderView(String publicId, String orderNumber, String statusCode, String statusLabel, boolean terminal,
                      boolean canCancel, String tableLabel, String paymentLabel, String totalText, String createdText,
@@ -29,6 +32,15 @@ public final class OrderView {
     public OrderView(String publicId, String orderNumber, String statusCode, String statusLabel, boolean terminal,
                      boolean canCancel, String tableLabel, String paymentLabel, String totalText, String createdText,
                      List<OrderLineView> lines, List<OrderStepView> steps, String cancelNote) {
+        this(publicId, orderNumber, statusCode, statusLabel, terminal, canCancel, tableLabel, paymentLabel, totalText,
+                createdText, lines, steps, cancelNote, null, null, null);
+    }
+
+    /** The full form, with the payment status and a short note about it for the student (both null when none). */
+    public OrderView(String publicId, String orderNumber, String statusCode, String statusLabel, boolean terminal,
+                     boolean canCancel, String tableLabel, String paymentLabel, String totalText, String createdText,
+                     List<OrderLineView> lines, List<OrderStepView> steps, String cancelNote,
+                     String paymentStatusCode, String paymentStatusLabel, String paymentNote) {
         this.publicId = publicId;
         this.orderNumber = orderNumber;
         this.statusCode = statusCode;
@@ -42,6 +54,9 @@ public final class OrderView {
         this.lines = List.copyOf(lines);
         this.steps = List.copyOf(steps);
         this.cancelNote = cancelNote;
+        this.paymentStatusCode = paymentStatusCode;
+        this.paymentStatusLabel = paymentStatusLabel;
+        this.paymentNote = paymentNote;
     }
 
     public String getPublicId() {
@@ -99,5 +114,24 @@ public final class OrderView {
     /** For cancelled orders: who cancelled and why, in words the student can read. Otherwise null. */
     public String getCancelNote() {
         return cancelNote;
+    }
+
+    /** The payment status code, or null when the order has no payment record. */
+    public String getPaymentStatusCode() {
+        return paymentStatusCode;
+    }
+
+    /** Lower-case, dash-separated payment status for styling, for example "refund-due". */
+    public String getPaymentStatusClass() {
+        return paymentStatusCode == null ? "" : paymentStatusCode.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+    }
+
+    public String getPaymentStatusLabel() {
+        return paymentStatusLabel;
+    }
+
+    /** A short sentence about the payment, for the student. */
+    public String getPaymentNote() {
+        return paymentNote;
     }
 }

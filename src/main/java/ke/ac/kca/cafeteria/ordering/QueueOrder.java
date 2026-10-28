@@ -25,11 +25,28 @@ public final class QueueOrder {
     private final String nextActionLabel;
     private final boolean canCancel;
     private final String cancelNote;
+    private final String paymentStatusCode;
+    private final String paymentStatusLabel;
+    private final String paymentReference;
+    private final boolean canVerifyPayment;
+    private final boolean canMarkRefunded;
+    private final boolean askPaymentReference;
 
+    /** An order with no payment record to show (the payment fields are empty and no payment buttons appear). */
     public QueueOrder(String publicId, String orderNumber, String statusCode, String statusLabel, String tableLabel,
                       String studentName, String createdText, String waitText, List<String> lines, String totalText, String paymentLabel,
                       long version, String nextStatusCode, String nextActionLabel, boolean canCancel,
                       String cancelNote) {
+        this(publicId, orderNumber, statusCode, statusLabel, tableLabel, studentName, createdText, waitText, lines,
+                totalText, paymentLabel, version, nextStatusCode, nextActionLabel, canCancel, cancelNote,
+                null, null, null, false, false, false);
+    }
+
+    public QueueOrder(String publicId, String orderNumber, String statusCode, String statusLabel, String tableLabel,
+                      String studentName, String createdText, String waitText, List<String> lines, String totalText, String paymentLabel,
+                      long version, String nextStatusCode, String nextActionLabel, boolean canCancel,
+                      String cancelNote, String paymentStatusCode, String paymentStatusLabel, String paymentReference,
+                      boolean canVerifyPayment, boolean canMarkRefunded, boolean askPaymentReference) {
         this.publicId = publicId;
         this.orderNumber = orderNumber;
         this.statusCode = statusCode;
@@ -46,6 +63,12 @@ public final class QueueOrder {
         this.nextActionLabel = nextActionLabel;
         this.canCancel = canCancel;
         this.cancelNote = cancelNote;
+        this.paymentStatusCode = paymentStatusCode;
+        this.paymentStatusLabel = paymentStatusLabel;
+        this.paymentReference = paymentReference;
+        this.canVerifyPayment = canVerifyPayment;
+        this.canMarkRefunded = canMarkRefunded;
+        this.askPaymentReference = askPaymentReference;
     }
 
     public String getPublicId() {
@@ -119,5 +142,39 @@ public final class QueueOrder {
     /** For cancelled orders: who cancelled and why. */
     public String getCancelNote() {
         return cancelNote;
+    }
+
+    /** The payment status code, or null when the order has no payment record. */
+    public String getPaymentStatusCode() {
+        return paymentStatusCode;
+    }
+
+    /** Lower-case, dash-separated payment status for styling, for example "refund-due". */
+    public String getPaymentStatusClass() {
+        return paymentStatusCode == null ? "" : paymentStatusCode.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+    }
+
+    public String getPaymentStatusLabel() {
+        return paymentStatusLabel;
+    }
+
+    /** The reference staff wrote down when they received the payment, for example an M-Pesa code. */
+    public String getPaymentReference() {
+        return paymentReference;
+    }
+
+    /** True while the payment is awaited, so the board offers "Mark payment received". */
+    public boolean isCanVerifyPayment() {
+        return canVerifyPayment;
+    }
+
+    /** True while a refund is due, so the board offers "Mark refund paid". */
+    public boolean isCanMarkRefunded() {
+        return canMarkRefunded;
+    }
+
+    /** True when the payment goes to the M-Pesa till, so the board offers a box for the M-Pesa code. */
+    public boolean isAskPaymentReference() {
+        return askPaymentReference;
     }
 }

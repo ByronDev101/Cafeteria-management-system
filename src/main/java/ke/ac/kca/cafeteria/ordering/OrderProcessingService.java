@@ -1,5 +1,7 @@
 package ke.ac.kca.cafeteria.ordering;
 
+import ke.ac.kca.cafeteria.finance.PaymentService;
+import ke.ac.kca.cafeteria.finance.PaymentView;
 import ke.ac.kca.cafeteria.menu.PriceParser;
 import ke.ac.kca.cafeteria.reporting.AuditService;
 import java.time.Duration;
@@ -35,13 +37,15 @@ public class OrderProcessingService {
 
     private final CustomerOrderRepository orders;
     private final AuditService audit;
+    private final PaymentService payments;
     private final ZoneId zone;
     private final DateTimeFormatter timeFormat;
 
-    public OrderProcessingService(CustomerOrderRepository orders, AuditService audit,
+    public OrderProcessingService(CustomerOrderRepository orders, AuditService audit, PaymentService payments,
                                   @Value("${app.display-timezone:Africa/Nairobi}") String zoneId) {
         this.orders = orders;
         this.audit = audit;
+        this.payments = payments;
         this.zone = ZoneId.of(zoneId);
         this.timeFormat = DateTimeFormatter.ofPattern("HH:mm").withZone(zone);
     }
@@ -52,7 +56,9 @@ public class OrderProcessingService {
     public List<QueueOrder> queue(QueueFilter filter) {
         StaffGuard.require();
         List<CustomerOrder> found;
-        if (filter.isFinishedView()) {
+        if (filter.isRefundView()) {
+            found = payments.refundsDue(BOARD_LIMIT);
+        } else if (filter.isFinishedView()) {
             Instant startOfDay = LocalDate.now(zone).atStartOfDay(zone).toInstant();
             found = orders.findByStatusCodeInAndUpdatedAtAfterOrderByUpdatedAtDesc(
                     filter.statusCodes(), startOfDay, PageRequest.of(0, BOARD_LIMIT));
@@ -60,7 +66,8 @@ public class OrderProcessingService {
             found = orders.findByStatusCodeInOrderByCreatedAtAsc(filter.statusCodes(), PageRequest.of(0, BOARD_LIMIT));
         }
         Instant now = Instant.now();
-        return found.stream().map(order -> toQueueOrder(order, now)).toList();
+        Map<Long, PaymentView> views = payments.viewsFor(found);
+        return found.stream().map(order -> toQueueOrder(order, now, views)).toList();
     }
 
     /** Numbers for the tabs: how many orders are new, in the kitchen, ready, and active overall. */
@@ -70,7 +77,9 @@ public class OrderProcessingService {
         Map<OrderStatus, Long> byStatus = countsByStatus();
         Map<QueueFilter, Long> counts = new EnumMap<>(QueueFilter.class);
         for (QueueFilter filter : QueueFilter.values()) {
-            if (!filter.isFinishedView()) {
+            if (filter.isRefundView()) {
+                counts.put(filter, payments.refundsDueCount());
+            } else if (!filter.isFinishedView()) {
                 counts.put(filter, filter.statuses().stream().mapToLong(s -> byStatus.getOrDefault(s, 0L)).sum());
             }
         }
@@ -92,7 +101,9 @@ public class OrderProcessingService {
             parts.add(row[0] + ":" + row[1] + ":" + stamp);
         }
         parts.sort(String::compareTo);
-        return String.join("|", parts);
+        String orderPart = String.join("|", parts);
+        String paymentPart = payments.pollPart();
+        return paymentPart == null || paymentPart.isEmpty() ? orderPart : orderPart + "#" + paymentPart;
     }
 
     // ---- changing status ----
@@ -128,8 +139,11 @@ public class OrderProcessingService {
             }
         }
 
-        // Sprint 5: when cafeteria credit is offered, cancelling a credit-funded order also reverses its credit here.
+        // Slice B: when cafeteria credit is offered, cancelling a credit-funded order also reverses its credit here.
         order.moveTo(next, actor, cleanReason);
+        if (next == OrderStatus.CANCELLED) {
+            payments.settleOnCancellation(actor, order);
+        }
         audit.record(actor, STATUS_CHANGED, TARGET, order.getPublicId(), SUCCESS,
                 "number=" + order.getOrderNumber() + "; " + current.name() + " -> " + next.name()
                         + (cleanReason == null ? "" : "; reason=" + cleanReason));
@@ -157,8 +171,9 @@ public class OrderProcessingService {
         throw new OrderException("Choose a valid status.");
     }
 
-    private QueueOrder toQueueOrder(CustomerOrder order, Instant now) {
+    private QueueOrder toQueueOrder(CustomerOrder order, Instant now, Map<Long, PaymentView> views) {
         OrderStatus status = order.getStatus();
+        PaymentView payment = order.getId() == null ? null : views.get(order.getId());
         List<String> lines = order.getItems().stream()
                 .map(item -> item.getQuantity() + " x " + item.getItemName())
                 .toList();
@@ -168,7 +183,10 @@ public class OrderProcessingService {
                 waitText(order.getCreatedAt(), now), lines, PriceParser.format(order.getTotal()),
                 order.getPaymentMethod().getLabel(), order.getVersion(),
                 next == null ? null : next.name(), next == null ? null : actionLabel(next),
-                status.canMoveTo(OrderStatus.CANCELLED), cancelNote(order, status));
+                status.canMoveTo(OrderStatus.CANCELLED), cancelNote(order, status),
+                payment == null ? null : payment.getStatusCode(), payment == null ? null : payment.getStatusLabel(),
+                payment == null ? null : payment.getReference(), payment != null && payment.isCanVerify(),
+                payment != null && payment.isCanMarkRefunded(), payment != null && payment.isAskReference());
     }
 
     /** The single "next" button for each status, or null once an order is finished. */

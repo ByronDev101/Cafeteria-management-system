@@ -14,11 +14,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ke.ac.kca.cafeteria.finance.PaymentService;
+import ke.ac.kca.cafeteria.finance.PaymentView;
 import ke.ac.kca.cafeteria.identity.AppUser;
 import ke.ac.kca.cafeteria.reporting.AuditService;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,11 +33,13 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class OrderProcessingServiceTest {
 
     private CustomerOrderRepository orders;
     private AuditService audit;
+    private PaymentService payments;
     private OrderProcessingService service;
     private AppUser amina;
 
@@ -42,7 +47,8 @@ class OrderProcessingServiceTest {
     void setUp() {
         orders = mock(CustomerOrderRepository.class);
         audit = mock(AuditService.class);
-        service = new OrderProcessingService(orders, audit, "Africa/Nairobi");
+        payments = mock(PaymentService.class);
+        service = new OrderProcessingService(orders, audit, payments, "Africa/Nairobi");
         amina = new AppUser("amina", "hash", "Amina Wanjiru");
         signInAs("ROLE_STAFF");
     }
@@ -265,6 +271,153 @@ class OrderProcessingServiceTest {
         assertThrows(OrderException.class, () -> service.transition("sam", order.getPublicId(), null, null, null));
         assertThrows(OrderException.class, () -> service.transition("sam", order.getPublicId(), "accepted", null, null));
         assertEquals(OrderStatus.SUBMITTED, order.getStatus());
+    }
+
+    // ---- payments on the board and in cancellations ----
+
+    @Test
+    void theBoardShowsEachOrdersPaymentAndOnlyTheButtonsThatApply() {
+        CustomerOrder order = newOrder();
+        ReflectionTestUtils.setField(order, "id", 11L);
+        when(orders.findByStatusCodeInOrderByCreatedAtAsc(eq(List.of("SUBMITTED", "ACCEPTED", "PREPARING", "READY")),
+                any(Pageable.class))).thenReturn(List.of(order));
+        PaymentView pending = new PaymentView("PENDING", "Awaiting payment", null, true, false, true, "note");
+        Map<Long, PaymentView> views = new HashMap<>();
+        views.put(11L, pending);
+        when(payments.viewsFor(any())).thenReturn(views);
+
+        QueueOrder q = service.queue(QueueFilter.ACTIVE).get(0);
+
+        assertEquals("PENDING", q.getPaymentStatusCode());
+        assertEquals("pending", q.getPaymentStatusClass());
+        assertEquals("Awaiting payment", q.getPaymentStatusLabel());
+        assertTrue(q.isCanVerifyPayment());
+        assertFalse(q.isCanMarkRefunded());
+        assertTrue(q.isAskPaymentReference());
+        assertNull(q.getPaymentReference());
+    }
+
+    @Test
+    void aReceivedPaymentShowsItsReferenceAndNoButtons() {
+        CustomerOrder order = newOrder();
+        ReflectionTestUtils.setField(order, "id", 12L);
+        when(orders.findByStatusCodeInOrderByCreatedAtAsc(any(), any(Pageable.class))).thenReturn(List.of(order));
+        PaymentView received = new PaymentView("VERIFIED", "Payment received", "SJK3H2L9PQ", false, false, true, "note");
+        Map<Long, PaymentView> views = new HashMap<>();
+        views.put(12L, received);
+        when(payments.viewsFor(any())).thenReturn(views);
+
+        QueueOrder q = service.queue(QueueFilter.ACTIVE).get(0);
+
+        assertEquals("Payment received", q.getPaymentStatusLabel());
+        assertEquals("SJK3H2L9PQ", q.getPaymentReference());
+        assertFalse(q.isCanVerifyPayment());
+        assertFalse(q.isCanMarkRefunded());
+    }
+
+    @Test
+    void anOrderWithNoPaymentRecordShowsNoPaymentAndNoPaymentButtons() {
+        CustomerOrder order = newOrder();
+        when(orders.findByStatusCodeInOrderByCreatedAtAsc(any(), any(Pageable.class))).thenReturn(List.of(order));
+
+        QueueOrder q = service.queue(QueueFilter.ACTIVE).get(0);
+
+        assertNull(q.getPaymentStatusLabel());
+        assertEquals("", q.getPaymentStatusClass());
+        assertFalse(q.isCanVerifyPayment());
+        assertFalse(q.isCanMarkRefunded());
+        assertFalse(q.isAskPaymentReference());
+    }
+
+    @Test
+    void theRefundsViewListsOrdersWhoseMoneyIsDueWhateverDayTheyWereCancelled() {
+        CustomerOrder cancelled = orderIn(OrderStatus.CANCELLED);
+        ReflectionTestUtils.setField(cancelled, "id", 13L);
+        when(payments.refundsDue(100)).thenReturn(List.of(cancelled));
+        PaymentView refundDue = new PaymentView("REFUND_DUE", "Refund due", "SJK3H2L9PQ", false, true, false, "note");
+        Map<Long, PaymentView> views = new HashMap<>();
+        views.put(13L, refundDue);
+        when(payments.viewsFor(any())).thenReturn(views);
+
+        List<QueueOrder> board = service.queue(QueueFilter.REFUNDS);
+
+        assertEquals(1, board.size());
+        assertEquals("refund-due", board.get(0).getPaymentStatusClass());
+        assertTrue(board.get(0).isCanMarkRefunded());
+        assertNull(board.get(0).getNextStatusCode());
+        verify(orders, never()).findByStatusCodeInOrderByCreatedAtAsc(any(), any(Pageable.class));
+        verify(orders, never()).findByStatusCodeInAndUpdatedAtAfterOrderByUpdatedAtDesc(any(), any(Instant.class),
+                any(Pageable.class));
+    }
+
+    @Test
+    void theRefundsTabIsCountedFromPaymentsNotOrders() {
+        when(orders.statusSummary()).thenReturn(List.<Object[]>of(new Object[] {"SUBMITTED", 2L, Instant.parse("2026-10-19T10:00:00Z")}));
+        when(payments.refundsDueCount()).thenReturn(3L);
+
+        Map<QueueFilter, Long> counts = service.counts();
+
+        assertEquals(3L, counts.get(QueueFilter.REFUNDS));
+        assertEquals(2L, counts.get(QueueFilter.NEW));
+    }
+
+    @Test
+    void thePollTokenAlsoChangesWhenAPaymentChanges() {
+        Instant t1 = Instant.parse("2026-10-19T10:00:00Z");
+        when(orders.statusSummary()).thenReturn(List.<Object[]>of(new Object[] {"SUBMITTED", 2L, t1}));
+
+        when(payments.pollPart()).thenReturn("");
+        String orderOnly = service.pollToken();
+        assertFalse(orderOnly.contains("#"));
+
+        when(payments.pollPart()).thenReturn("PAY-PENDING:2:100");
+        String withPayments = service.pollToken();
+        assertTrue(withPayments.startsWith(orderOnly));
+        assertTrue(withPayments.endsWith("#PAY-PENDING:2:100"));
+
+        when(payments.pollPart()).thenReturn("PAY-VERIFIED:1:200|PAY-PENDING:1:100");
+        assertNotEquals(withPayments, service.pollToken());
+    }
+
+    @Test
+    void staffCancellingAnOrderSettlesItsPaymentAsTheStaffMember() {
+        CustomerOrder order = newOrder();
+
+        service.transition("sam", order.getPublicId(), "CANCELLED", "Out of stock", 0L);
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        verify(payments).settleOnCancellation("sam", order);
+    }
+
+    @Test
+    void movesThatAreNotCancellationsLeaveThePaymentAlone() {
+        CustomerOrder order = newOrder();
+        for (String step : List.of("ACCEPTED", "PREPARING", "READY", "COMPLETED")) {
+            service.transition("sam", order.getPublicId(), step, null, null);
+        }
+        verify(payments, never()).settleOnCancellation(any(), any());
+    }
+
+    @Test
+    void aRefusedCancellationLeavesThePaymentAlone() {
+        CustomerOrder fresh = newOrder();
+        assertThrows(OrderException.class, () -> service.transition("sam", fresh.getPublicId(), "CANCELLED", "ab", 0L));
+        assertThrows(OrderException.class, () -> service.transition("sam", fresh.getPublicId(), "CANCELLED", "Out of stock", 9L));
+
+        CustomerOrder finished = orderIn(OrderStatus.COMPLETED);
+        assertThrows(OrderException.class,
+                () -> service.transition("sam", finished.getPublicId(), "CANCELLED", "Too late", null));
+
+        verify(payments, never()).settleOnCancellation(any(), any());
+    }
+
+    @Test
+    void theRefundsViewIsForStaffAndManagersOnly() {
+        for (String role : List.of("ROLE_STUDENT", "ROLE_ADMIN")) {
+            signInAs(role);
+            assertThrows(AccessDeniedException.class, () -> service.queue(QueueFilter.REFUNDS), role);
+        }
+        verify(payments, never()).refundsDue(org.mockito.ArgumentMatchers.anyInt());
     }
 
     // ---- who may do this ----

@@ -1,5 +1,7 @@
 package ke.ac.kca.cafeteria.ordering;
 
+import ke.ac.kca.cafeteria.finance.PaymentResult;
+import ke.ac.kca.cafeteria.finance.PaymentService;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -21,9 +23,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class StaffOrderController {
 
     private final OrderProcessingService processing;
+    private final PaymentService payments;
 
-    public StaffOrderController(OrderProcessingService processing) {
+    public StaffOrderController(OrderProcessingService processing, PaymentService payments) {
         this.processing = processing;
+        this.payments = payments;
     }
 
     @GetMapping("/staff/orders")
@@ -54,6 +58,43 @@ public class StaffOrderController {
         } catch (OptimisticLockingFailureException e) {
             redirect.addFlashAttribute("errors",
                     List.of("That order was changed at the same moment by someone else. The board has been refreshed."));
+        }
+        return "redirect:/staff/orders?filter=" + QueueFilter.parse(filter).name();
+    }
+
+    /** Staff write down that the payment for an order has been received. The reference (an M-Pesa code) is optional. */
+    @PostMapping("/staff/orders/{id}/payment/verify")
+    public String paymentReceived(@PathVariable String id,
+                                  @RequestParam(required = false) String reference,
+                                  @RequestParam(required = false) String filter,
+                                  Principal principal, RedirectAttributes redirect) {
+        try {
+            PaymentResult result = payments.verify(principal.getName(), id, reference);
+            redirect.addFlashAttribute("message",
+                    "Payment for order " + result.orderNumber() + " marked as received.");
+        } catch (OrderException e) {
+            redirect.addFlashAttribute("errors", e.getMessages());
+        } catch (OptimisticLockingFailureException e) {
+            redirect.addFlashAttribute("errors",
+                    List.of("That payment was changed at the same moment by someone else. The board has been refreshed."));
+        }
+        return "redirect:/staff/orders?filter=" + QueueFilter.parse(filter).name();
+    }
+
+    /** Staff write down that a refund has been handed back. */
+    @PostMapping("/staff/orders/{id}/payment/refunded")
+    public String refundPaid(@PathVariable String id,
+                             @RequestParam(required = false) String filter,
+                             Principal principal, RedirectAttributes redirect) {
+        try {
+            PaymentResult result = payments.markRefunded(principal.getName(), id);
+            redirect.addFlashAttribute("message",
+                    "Refund for order " + result.orderNumber() + " marked as paid.");
+        } catch (OrderException e) {
+            redirect.addFlashAttribute("errors", e.getMessages());
+        } catch (OptimisticLockingFailureException e) {
+            redirect.addFlashAttribute("errors",
+                    List.of("That payment was changed at the same moment by someone else. The board has been refreshed."));
         }
         return "redirect:/staff/orders?filter=" + QueueFilter.parse(filter).name();
     }

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reports - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/finance.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/manager-nav :: nav}"/>
+<main class="report">
+    <h1>Reports</h1>
+    <p class="text-secondary">
+        Times are campus time (Africa/Nairobi). Payment figures are prototype records written down by staff.
+        No real money moves through this system.
+    </p>
+
+    <div th:each="w : ${report.warnings}" class="alert alert-warning" role="status" th:text="${w}">Warning</div>
+
+    <form class="card card-body mb-4" method="get" th:action="@{/manager/reports}" aria-label="Report filters">
+        <div class="row g-3 align-items-end">
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="from">From</label>
+                <input class="form-control" type="date" id="from" name="from" th:value="${report.fromText}">
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="to">To</label>
+                <input class="form-control" type="date" id="to" name="to" th:value="${report.toText}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="status">Order status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All statuses</option>
+                    <option th:each="s : ${statuses}" th:value="${s.name()}" th:text="${s.label}"
+                            th:selected="${s.name() == report.status}">Submitted</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="number">Order number</label>
+                <input class="form-control" type="text" id="number" name="number" maxlength="40" autocomplete="off"
+                       th:value="${report.numberText}" placeholder="SC-">
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="table">Table</label>
+                <input class="form-control" type="text" id="table" name="table" maxlength="40" autocomplete="off"
+                       th:value="${report.tableText}" placeholder="Table 7">
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Show report</button>
+            </div>
+        </div>
+    </form>
+
+    <h2 class="h5">Payments</h2>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md" th:each="p : ${report.paymentLines}">
+            <div class="card card-body h-100">
+                <span class="pay-pill align-self-start mb-2" th:classappend="${p.styleClass}" th:text="${p.label}">Payment received</span>
+                <span class="report-figure" th:text="${p.amountText}">KSh 0.00</span>
+                <span class="report-count"><span th:text="${p.count}">0</span> records</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <section class="col-12 col-lg-6" aria-label="Orders by status">
+            <h2 class="h5">Orders by status</h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Status</th><th class="text-end">Orders</th><th class="text-end">Value</th></tr></thead>
+                    <tbody>
+                    <tr th:each="l : ${report.orderLines}">
+                        <td><span class="status-pill" th:classappend="${l.styleClass}" th:text="${l.label}">Submitted</span></td>
+                        <td class="text-end" th:text="${l.count}">0</td>
+                        <td class="text-end text-nowrap" th:text="${l.amountText}">KSh 0.00</td>
+                    </tr>
+                    </tbody>
+                    <tfoot><tr><th>All orders</th><th class="text-end" th:text="${report.orderCount}">0</th><th></th></tr></tfoot>
+                </table>
+            </div>
+        </section>
+        <section class="col-12 col-lg-6" aria-label="Payments received by method">
+            <h2 class="h5">Payments received, by method</h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Method</th><th class="text-end">Payments</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                    <tr th:each="m : ${report.methodLines}">
+                        <td th:text="${m.label}">Cash</td>
+                        <td class="text-end" th:text="${m.count}">0</td>
+                        <td class="text-end text-nowrap" th:text="${m.amountText}">KSh 0.00</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <h2 class="h5">Orders</h2>
+    <p class="empty-note" th:if="${#lists.isEmpty(report.rows)}">No orders match these dates and filters.</p>
+    <div class="table-responsive" th:unless="${#lists.isEmpty(report.rows)}">
+        <table class="table table-sm align-middle">
+            <thead>
+            <tr><th>Order</th><th>Placed</th><th>Table</th><th>Status</th><th>Payment</th><th class="text-end">Total</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${report.rows}">
+                <td class="fw-bold text-nowrap" th:text="${r.orderNumber}">SC-ABC123</td>
+                <td class="text-nowrap" th:text="${r.createdText}">1 Jan 2026, 12:00</td>
+                <td th:text="${r.tableLabel}">Table 7</td>
+                <td><span class="status-pill" th:classappend="${r.statusClass}" th:text="${r.statusLabel}">Submitted</span></td>
+                <td>
+                    <span th:text="${r.methodLabel}">Cash</span>
+                    <span class="pay-pill ms-1" th:if="${r.paymentLabel}" th:classappend="${r.paymentClass}" th:text="${r.paymentLabel}">Awaiting payment</span>
+                </td>
+                <td class="text-end text-nowrap" th:text="${r.totalText}">KSh 0.00</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="text-secondary small" th:if="${report.moreMatches}">
+        More orders matched than are shown. Showing the newest <span th:text="${report.limit}">100</span>.
+        Narrow the dates or filters to see the rest.
+    </p>
+</main>
+</body>
+</html>

@@ -1,0 +1,28 @@
+/* Payment status and the manager reports (Sprint 5). Loaded after app.css; no inline styles anywhere. */
+
+.pay-pill {
+    display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--cream-deep); color: var(--brown);
+    font: 800 11px/1.2 var(--font-body); letter-spacing: .06em; text-transform: uppercase;
+}
+.pay-pending { background: #fff4dc; color: #6b4400; }
+.pay-verified { background: #dcf2e4; color: #1f5a37; }
+.pay-voided { background: #e8e2da; color: #4a3f34; }
+.pay-refund-due { background: #fdece8; color: #7a1f12; }
+.pay-refunded { background: #e3effd; color: #1e3a8a; }
+
+/* staff board */
+.ticket-pay { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ticket-ref { color: var(--muted); font-size: 13px; font-weight: 600; }
+.ticket-pay-action { margin: 4px 0 0; }
+.ticket-pay-action .btn { min-height: 44px; font-size: 15px; }
+
+/* student order page */
+.pay-note { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+.prototype-note { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+
+/* manager reports */
+.report { max-width: 1100px; margin: 0 auto; padding: 24px 20px 48px; }
+.report h1 { font: 800 28px/1.15 var(--font-head); }
+.report-figure { font: 800 24px/1.1 var(--font-head); color: var(--brown); }
+.report-label { color: var(--muted); font-size: 13px; font-weight: 700; }
+.report-count { color: var(--muted); font-size: 13px; }
