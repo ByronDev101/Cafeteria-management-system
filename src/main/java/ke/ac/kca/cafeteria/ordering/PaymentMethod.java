@@ -5,7 +5,8 @@ import java.util.Optional;
 
 /**
  * How a student says they will pay (FR-015). Payments are recorded offline by staff; no card, mobile-money PIN or
- * bank detail is ever collected. CREDIT is reserved for Sprint 5 and is not offered yet.
+ * bank detail is ever collected. CREDIT is offered only to students a manager has given a credit limit, so it is not
+ * in offered(); the cart adds it for those students.
  */
 public enum PaymentMethod {
 

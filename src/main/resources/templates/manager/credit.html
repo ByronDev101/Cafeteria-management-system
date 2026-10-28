@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Student credit - Smart Cafeteria</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/finance.css}">
+</head>
+<body>
+<th:block th:replace="~{fragments/manager-nav :: nav}"/>
+<main class="report">
+    <h1>Student credit</h1>
+    <p class="text-secondary">
+        Set how much credit each student may have, and record payments against what they owe. Amounts are prototype
+        records. No real money moves through this system. Limits can be at most <span th:text="${maxLimitText}">KSh 50,000.00</span>.
+    </p>
+
+    <div th:if="${message}" class="alert alert-success" role="status" th:text="${message}">Saved.</div>
+    <div th:if="${errors}" class="alert alert-danger" role="alert">
+        <div th:each="e : ${errors}" th:text="${e}">Problem</div>
+    </div>
+
+    <form class="card card-body mb-4" method="get" th:action="@{/manager/credit}" aria-label="Find a student">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-9">
+                <label class="form-label" for="q">Find a student by name or username</label>
+                <input class="form-control" type="text" id="q" name="q" maxlength="40" autocomplete="off" th:value="${q}">
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Search</button>
+            </div>
+        </div>
+        <p class="small text-secondary mt-2 mb-0" th:if="${#strings.isEmpty(q)}">
+            Showing students who already have credit. Search to give someone new a limit.
+        </p>
+    </form>
+
+    <p class="empty-note" th:if="${#lists.isEmpty(rows)}">
+        <span th:if="${#strings.isEmpty(q)}">No student has credit yet. Search for a student to set a limit.</span>
+        <span th:unless="${#strings.isEmpty(q)}">No active student matches that search.</span>
+    </p>
+
+    <div class="d-grid gap-3 mb-4">
+        <section class="card card-body" th:each="r : ${rows}" th:attr="aria-label=${r.displayName}">
+            <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                <div>
+                    <strong th:text="${r.displayName}">Amina Wanjiru</strong>
+                    <span class="text-secondary small" th:text="'(' + ${r.username} + ')'">(amina)</span>
+                </div>
+                <span class="report-count" th:unless="${r.balance.hasAccount}">No credit yet</span>
+            </div>
+            <div class="credit-grid mb-3">
+                <div class="credit-figure"><span class="report-label">Limit</span><span class="report-figure" th:text="${r.balance.limitText}">KSh 0.00</span></div>
+                <div class="credit-figure"><span class="report-label">Held for orders</span><span class="report-figure" th:text="${r.balance.heldText}">KSh 0.00</span></div>
+                <div class="credit-figure"><span class="report-label">Owes</span><span class="report-figure" th:text="${r.balance.owedText}">KSh 0.00</span></div>
+                <div class="credit-figure"><span class="report-label">Available</span><span class="report-figure" th:text="${r.balance.availableText}">KSh 0.00</span></div>
+            </div>
+
+            <form method="post" class="row g-2 align-items-end mb-2" th:action="@{/manager/credit/{id}/limit(id=${r.studentPublicId})}">
+                <input type="hidden" name="q" th:value="${q}">
+                <div class="col-8 col-md-4">
+                    <label class="form-label small mb-1" th:for="'limit-' + ${r.studentPublicId}">Credit limit (KSh)</label>
+                    <input class="form-control" type="text" inputmode="decimal" name="limit" maxlength="10" autocomplete="off"
+                           th:id="'limit-' + ${r.studentPublicId}" th:value="${r.limitInput}">
+                </div>
+                <div class="col-4 col-md-3">
+                    <button type="submit" class="btn btn-outline-primary w-100">Set limit</button>
+                </div>
+            </form>
+
+            <form method="post" class="row g-2 align-items-end" th:if="${r.canSettle}" th:action="@{/manager/credit/{id}/settle(id=${r.studentPublicId})}">
+                <input type="hidden" name="q" th:value="${q}">
+                <div class="col-6 col-md-3">
+                    <label class="form-label small mb-1" th:for="'amount-' + ${r.studentPublicId}">Payment received (KSh)</label>
+                    <input class="form-control" type="text" inputmode="decimal" name="amount" maxlength="10" autocomplete="off"
+                           th:id="'amount-' + ${r.studentPublicId}">
+                </div>
+                <div class="col-6 col-md-5">
+                    <label class="form-label small mb-1" th:for="'note-' + ${r.studentPublicId}">Note (optional)</label>
+                    <input class="form-control" type="text" name="note" maxlength="100" autocomplete="off"
+                           th:id="'note-' + ${r.studentPublicId}" placeholder="Paid at the till">
+                </div>
+                <div class="col-12 col-md-3">
+                    <button type="submit" class="btn btn-outline-primary w-100">Record payment</button>
+                </div>
+            </form>
+        </section>
+    </div>
+</main>
+</body>
+</html>

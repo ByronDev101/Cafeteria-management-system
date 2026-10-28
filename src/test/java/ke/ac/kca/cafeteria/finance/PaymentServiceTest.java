@@ -310,6 +310,79 @@ class PaymentServiceTest {
                 assertThrows(OrderException.class, () -> service.verify("sam", noRecord.getPublicId(), null)).getMessage());
     }
 
+    // ---- cafeteria credit ----
+
+    @Test
+    void aCreditOrdersPaymentIsNeverMarkedReceivedByHand() {
+        CustomerOrder order = order(PaymentMethod.CREDIT);
+        PaymentRecord record = recordIn(order, PaymentStatus.PENDING);
+
+        OrderException e = assertThrows(OrderException.class,
+                () -> service.verify("sam", order.getPublicId(), null));
+
+        assertTrue(e.getMessage().contains("paid with cafeteria credit"));
+        assertEquals(PaymentStatus.PENDING, record.getStatus());
+        verify(audit, never()).record(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void acceptingACreditOrderMarksItsPaymentReceivedAsTheStaffMember() {
+        CustomerOrder order = order(PaymentMethod.CREDIT);
+        PaymentRecord record = recordIn(order, PaymentStatus.PENDING);
+
+        service.receiveByCredit("sam", order);
+
+        assertEquals(PaymentStatus.VERIFIED, record.getStatus());
+        assertEquals("sam", record.getVerifiedBy());
+        assertNull(record.getReference());
+        verify(audit).record(eq("sam"), eq("PAYMENT_VERIFIED"), eq("PAYMENT"), eq(record.getPublicId()), eq("SUCCESS"),
+                argThat(details -> details.contains("PENDING -> VERIFIED") && details.contains("charged to cafeteria credit")
+                        && details.contains("no real money")));
+    }
+
+    @Test
+    void receivingByCreditIgnoresOtherOrdersAndRecordsNotAwaitingPayment() {
+        CustomerOrder cash = order(PaymentMethod.CASH);
+        PaymentRecord cashRecord = recordIn(cash, PaymentStatus.PENDING);
+        service.receiveByCredit("sam", cash);
+        assertEquals(PaymentStatus.PENDING, cashRecord.getStatus());
+
+        for (PaymentStatus status : List.of(PaymentStatus.VERIFIED, PaymentStatus.VOIDED)) {
+            CustomerOrder credit = order(PaymentMethod.CREDIT);
+            PaymentRecord record = recordIn(credit, status);
+            service.receiveByCredit("sam", credit);
+            assertEquals(status, record.getStatus());
+        }
+
+        CustomerOrder noRecord = order(PaymentMethod.CREDIT);
+        service.receiveByCredit("sam", noRecord);
+
+        verify(audit, never()).record(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void cancellingACreditOrderAfterAcceptanceClosesTheRecordWithoutAHandRefund() {
+        CustomerOrder order = order(PaymentMethod.CREDIT);
+        PaymentRecord record = recordIn(order, PaymentStatus.VERIFIED);
+
+        service.settleOnCancellation("sam", order);
+
+        assertEquals(PaymentStatus.REFUNDED, record.getStatus());
+        verify(audit).record(eq("sam"), eq("PAYMENT_REFUNDED"), eq("PAYMENT"), eq(record.getPublicId()), eq("SUCCESS"),
+                argThat(details -> details.contains("VERIFIED -> REFUNDED") && details.contains("credit charge reversed")));
+        verify(audit, never()).record(any(), eq("PAYMENT_REFUND_DUE"), any(), any(), any(), any());
+    }
+
+    @Test
+    void cancellingACreditOrderBeforeAcceptanceVoidsTheRecord() {
+        CustomerOrder order = order(PaymentMethod.CREDIT);
+        PaymentRecord record = recordIn(order, PaymentStatus.PENDING);
+
+        service.settleOnCancellation("amina", order);
+
+        assertEquals(PaymentStatus.VOIDED, record.getStatus());
+    }
+
     // ---- who may do this ----
 
     @Test

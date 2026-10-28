@@ -1,5 +1,7 @@
 package ke.ac.kca.cafeteria.ordering;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -8,12 +10,15 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.HttpSession;
 import ke.ac.kca.cafeteria.config.SecurityConfig;
+import ke.ac.kca.cafeteria.credit.CreditBalance;
+import ke.ac.kca.cafeteria.credit.CreditService;
 import ke.ac.kca.cafeteria.menu.OrderableItem;
 import ke.ac.kca.cafeteria.table.SelectedTable;
 import ke.ac.kca.cafeteria.table.TableService;
@@ -43,6 +48,9 @@ class StudentCartControllerTest {
     @MockitoBean
     TableService tables;
 
+    @MockitoBean
+    CreditService credit;
+
     private static CartView fullCart() {
         CartLine tea = new CartLine("i1", "Tea", "KSh 50.00", 2, "KSh 100.00", true, null, 7L);
         CartLine juice = new CartLine("i2", "Fresh Juice", "KSh 120.00", 1, "KSh 120.00", false, "sold out", null);
@@ -55,6 +63,39 @@ class StudentCartControllerTest {
         when(carts.view(any(Cart.class))).thenReturn(fullCart());
         when(tables.currentTable(any(HttpSession.class))).thenReturn(Optional.of(new SelectedTable("t1", "Table 7")));
         mvc.perform(get("/student/cart")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "amina", roles = "STUDENT")
+    void creditIsOfferedWithTheAmountLeftWhenTheStudentHasSome() throws Exception {
+        when(carts.view(any(Cart.class))).thenReturn(fullCart());
+        CreditBalance balance = new CreditBalance(true, new BigDecimal("500.00"), new BigDecimal("100.00"),
+                new BigDecimal("150.00"));
+        when(credit.balanceOf("amina")).thenReturn(balance);
+
+        mvc.perform(get("/student/cart"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Cafeteria credit")))
+           .andExpect(content().string(containsString("Available now: KSh 250.00")))
+           .andExpect(content().string(containsString("value=\"CREDIT\"")));
+    }
+
+    @Test
+    @WithMockUser(username = "amina", roles = "STUDENT")
+    void creditIsNotOfferedWithoutAnAccountOrWithNothingLeft() throws Exception {
+        when(carts.view(any(Cart.class))).thenReturn(fullCart());
+
+        when(credit.balanceOf("amina")).thenReturn(new CreditBalance(false, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+        mvc.perform(get("/student/cart"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(not(containsString("value=\"CREDIT\""))));
+
+        when(credit.balanceOf("amina")).thenReturn(new CreditBalance(true, new BigDecimal("200.00"),
+                new BigDecimal("50.00"), new BigDecimal("150.00")));
+        mvc.perform(get("/student/cart"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(not(containsString("value=\"CREDIT\""))))
+           .andExpect(content().string(not(containsString("Available now"))));
     }
 
     @Test

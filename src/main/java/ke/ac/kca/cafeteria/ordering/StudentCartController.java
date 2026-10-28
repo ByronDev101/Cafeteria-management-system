@@ -2,9 +2,13 @@ package ke.ac.kca.cafeteria.ordering;
 
 import jakarta.servlet.http.HttpSession;
 import ke.ac.kca.cafeteria.config.PageContext;
+import ke.ac.kca.cafeteria.credit.CreditBalance;
+import ke.ac.kca.cafeteria.credit.CreditService;
 import ke.ac.kca.cafeteria.menu.OrderableItem;
 import ke.ac.kca.cafeteria.table.TableService;
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
@@ -22,12 +26,14 @@ public class StudentCartController {
 
     private final CartService carts;
     private final TableService tables;
+    private final CreditService credit;
     private final String zone;
 
-    public StudentCartController(CartService carts, TableService tables,
+    public StudentCartController(CartService carts, TableService tables, CreditService credit,
                                  @Value("${app.display-timezone:Africa/Nairobi}") String zone) {
         this.carts = carts;
         this.tables = tables;
+        this.credit = credit;
         this.zone = zone;
     }
 
@@ -36,7 +42,13 @@ public class StudentCartController {
         Cart cart = CartSession.get(session);
         model.addAttribute("cart", carts.view(cart));
         model.addAttribute("idempotencyKey", cart.idempotencyKey());
-        model.addAttribute("paymentMethods", PaymentMethod.offered());
+        List<PaymentMethod> methods = new ArrayList<>(PaymentMethod.offered());
+        CreditBalance balance = credit.balanceOf(principal.getName());
+        if (balance != null && balance.isCanUse()) {
+            methods.add(PaymentMethod.CREDIT);
+            model.addAttribute("creditAvailable", balance.getAvailableText());
+        }
+        model.addAttribute("paymentMethods", methods);
         model.addAttribute("welcome", PageContext.welcomeName(principal));
         model.addAttribute("today", PageContext.todayLabel(zone));
         tables.currentTable(session).ifPresent(table -> model.addAttribute("table", table));

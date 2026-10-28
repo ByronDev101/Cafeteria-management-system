@@ -46,6 +46,16 @@ class PaymentViewTest {
     }
 
     @Test
+    void creditOrdersGetNoReceivedButtonAndNotesAboutCredit() {
+        for (PaymentStatus status : PaymentStatus.values()) {
+            PaymentView view = PaymentView.of(record(PaymentMethod.CREDIT, status));
+            assertFalse(view.isCanVerify(), status.name());
+            assertFalse(view.isAskReference(), status.name());
+            assertTrue(view.getStudentNote().toLowerCase().contains("credit"), status.name() + ": " + view.getStudentNote());
+        }
+    }
+
+    @Test
     void theMpesaCodeBoxIsOfferedOnlyForMpesaPayments() {
         assertTrue(PaymentView.of(record(PaymentMethod.MPESA_TILL, PaymentStatus.PENDING)).isAskReference());
         assertFalse(PaymentView.of(record(PaymentMethod.CASH, PaymentStatus.PENDING)).isAskReference());

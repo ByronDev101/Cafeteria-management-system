@@ -23,6 +23,7 @@
             <summary aria-label="Account menu"><th:block th:replace="~{fragments/icons :: user}"/></summary>
             <div class="profile-dropdown">
                 <a th:if="${cartCount != null}" th:href="@{/student/orders}">My orders</a>
+                <a th:if="${cartCount != null}" th:href="@{/student/credit}">My credit</a>
                 <a th:href="@{/account/password}">Change password</a>
                 <form th:action="@{/logout}" method="post">
                     <button type="submit">Sign out</button>

@@ -1,5 +1,6 @@
 package ke.ac.kca.cafeteria.ordering;
 
+import ke.ac.kca.cafeteria.credit.CreditService;
 import ke.ac.kca.cafeteria.finance.PaymentService;
 import ke.ac.kca.cafeteria.finance.PaymentView;
 import ke.ac.kca.cafeteria.menu.PriceParser;
@@ -38,14 +39,16 @@ public class OrderProcessingService {
     private final CustomerOrderRepository orders;
     private final AuditService audit;
     private final PaymentService payments;
+    private final CreditService credit;
     private final ZoneId zone;
     private final DateTimeFormatter timeFormat;
 
     public OrderProcessingService(CustomerOrderRepository orders, AuditService audit, PaymentService payments,
-                                  @Value("${app.display-timezone:Africa/Nairobi}") String zoneId) {
+                                  CreditService credit, @Value("${app.display-timezone:Africa/Nairobi}") String zoneId) {
         this.orders = orders;
         this.audit = audit;
         this.payments = payments;
+        this.credit = credit;
         this.zone = ZoneId.of(zoneId);
         this.timeFormat = DateTimeFormatter.ofPattern("HH:mm").withZone(zone);
     }
@@ -139,9 +142,14 @@ public class OrderProcessingService {
             }
         }
 
-        // Slice B: when cafeteria credit is offered, cancelling a credit-funded order also reverses its credit here.
         order.moveTo(next, actor, cleanReason);
+        if (next == OrderStatus.ACCEPTED) {
+            // A credit order's hold becomes a charge now. Refused (and the whole step undone) if no credit is held.
+            credit.postOnAcceptance(actor, order);
+            payments.receiveByCredit(actor, order);
+        }
         if (next == OrderStatus.CANCELLED) {
+            credit.releaseOnCancellation(actor, order);
             payments.settleOnCancellation(actor, order);
         }
         audit.record(actor, STATUS_CHANGED, TARGET, order.getPublicId(), SUCCESS,
