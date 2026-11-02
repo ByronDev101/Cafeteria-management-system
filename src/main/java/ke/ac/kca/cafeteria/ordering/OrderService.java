@@ -52,11 +52,12 @@ public class OrderService {
     private final AuditService audit;
     private final PaymentService payments;
     private final CreditService credit;
+    private final OrderRateLimiter orderLimit;
     private final DateTimeFormatter timeFormat;
 
     public OrderService(CustomerOrderRepository orders, UserRepository users, TableService tables,
                         MenuService menu, AuditService audit, PaymentService payments, CreditService credit,
-                        @Value("${app.display-timezone:Africa/Nairobi}") String zoneId) {
+                        OrderRateLimiter orderLimit, @Value("${app.display-timezone:Africa/Nairobi}") String zoneId) {
         this.orders = orders;
         this.users = users;
         this.tables = tables;
@@ -64,6 +65,7 @@ public class OrderService {
         this.audit = audit;
         this.payments = payments;
         this.credit = credit;
+        this.orderLimit = orderLimit;
         this.timeFormat = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneId.of(zoneId));
     }
 
@@ -82,6 +84,8 @@ public class OrderService {
                 return new PlacedOrder(earlier.get().getPublicId(), earlier.get().getOrderNumber(), true);
             }
         }
+
+        orderLimit.ensureAllowed(username);
 
         List<String> problems = new ArrayList<>();
         if (method == null || !(method == PaymentMethod.CREDIT || PaymentMethod.offered().contains(method))) {
@@ -134,6 +138,7 @@ public class OrderService {
         audit.record(student.getUsername(), PLACED, TARGET, order.getPublicId(), SUCCESS,
                 "number=" + order.getOrderNumber() + "; table=" + order.getTableLabel()
                         + "; total=" + order.getTotal().toPlainString() + "; payment=" + method.name());
+        orderLimit.recordPlaced(username);
         return new PlacedOrder(order.getPublicId(), order.getOrderNumber(), false);
     }
 
