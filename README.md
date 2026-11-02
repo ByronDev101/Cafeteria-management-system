@@ -11,6 +11,9 @@ Design baseline: SRS-SC-001 and SDS-SC-001.
 5. Open http://localhost:8080/login and sign in with the temporary dev account (dev profile only):
    `dev.student` / `ChangeMe123!` (removed in Sprint 1).
 
+## Production (HTTPS and limits)
+See `docs/https-and-limits.md` for the `prod` and `behind-proxy` profiles, the certificate steps and the rate limits.
+
 ## Branching
 `main` = stable, `develop` = integration, `feature/<short-name>` = work, merged to `develop` by pull request.
 

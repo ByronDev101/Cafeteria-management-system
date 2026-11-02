@@ -1,6 +1,10 @@
 package ke.ac.kca.cafeteria.config;
 
 import ke.ac.kca.cafeteria.identity.MustChangePasswordFilter;
+import ke.ac.kca.cafeteria.security.LoginThrottle;
+import ke.ac.kca.cafeteria.security.LoginThrottleFilter;
+import java.time.Duration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -11,7 +15,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfException;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 
 /**
@@ -22,8 +29,22 @@ import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private final boolean requireHttps;
+
+    /** With app.require-https=true (the prod and behind-proxy profiles) every plain-HTTP request is sent to HTTPS. */
+    public SecurityConfig(@Value("${app.require-https:false}") boolean requireHttps) {
+        this.requireHttps = requireHttps;
+    }
+
+    /** Counts failed sign-ins per address. By default 10 failures in 15 minutes blocks that address for a while. */
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    LoginThrottle loginThrottle(@Value("${app.rate-limit.login.max-failures:10}") int maxFailures,
+                                @Value("${app.rate-limit.login.window-minutes:15}") long windowMinutes) {
+        return new LoginThrottle(maxFailures, Duration.ofMinutes(windowMinutes));
+    }
+
+    @Bean
+    SecurityFilterChain filterChain(HttpSecurity http, LoginThrottle loginThrottle) throws Exception {
         // Remember the page a visitor asked for, so scanning a table QR code while signed out
         // continues to that table after sign-in.
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
@@ -51,8 +72,17 @@ public class SecurityConfig {
             .headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(
                     "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
-                    + "frame-ancestors 'none'; form-action 'self'")))
+                    + "frame-ancestors 'none'; form-action 'self'"))
+                // Browsers that have seen the site over HTTPS keep using HTTPS (sent only on secure connections).
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000))
+                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                        "camera=(), microphone=(), geolocation=(), payment=()")))
+            .addFilterBefore(new LoginThrottleFilter(loginThrottle), UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(new MustChangePasswordFilter(), AnonymousAuthenticationFilter.class);
+        if (requireHttps) {
+            http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
+        }
         return http.build();
     }
 

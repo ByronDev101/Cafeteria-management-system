@@ -50,6 +50,7 @@ class OrderServiceTest {
     private AuditService audit;
     private PaymentService payments;
     private CreditService credit;
+    private OrderRateLimiter orderLimit;
     private OrderService service;
     private AppUser amina;
 
@@ -66,7 +67,8 @@ class OrderServiceTest {
         audit = mock(AuditService.class);
         payments = mock(PaymentService.class);
         credit = mock(CreditService.class);
-        service = new OrderService(orders, users, tables, menu, audit, payments, credit, "Africa/Nairobi");
+        orderLimit = new OrderRateLimiter(3, 10);
+        service = new OrderService(orders, users, tables, menu, audit, payments, credit, orderLimit, "Africa/Nairobi");
 
         amina = new AppUser("amina", "hash", "Amina Wanjiru");
         when(users.findByUsername("amina")).thenReturn(Optional.of(amina));
@@ -394,6 +396,64 @@ class OrderServiceTest {
         assertEquals("pending", view.getPaymentStatusClass());
         assertEquals("Awaiting payment", view.getPaymentStatusLabel());
         assertEquals("Staff write down your payment when they receive it.", view.getPaymentNote());
+    }
+
+    // ---- a flood of orders is slowed down ----
+
+    @Test
+    void aStudentWhoHasPlacedTooManyOrdersLatelyIsAskedToWait() {
+        for (int i = 0; i < 3; i++) {
+            service.place("amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-0000000" + i);
+        }
+
+        OrderException e = assertThrows(OrderException.class,
+                () -> service.place("amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-99999999"));
+
+        assertTrue(e.getMessage().contains("several orders in a short time"), e.getMessage());
+        assertTrue(e.getMessage().contains("minute"), e.getMessage());
+        verify(orders, org.mockito.Mockito.times(3)).save(any());
+    }
+
+    @Test
+    void theLimitIsPerStudentAndIgnoresCapitalLetters() {
+        for (int i = 0; i < 3; i++) {
+            service.place("Amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-0000000" + i);
+        }
+        assertThrows(OrderException.class,
+                () -> service.place("amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-11111111"));
+
+        AppUser brian = new AppUser("brian", "hash", "Brian Otieno");
+        when(users.findByUsername("brian")).thenReturn(Optional.of(brian));
+        assertNotNull(service.place("brian", lines("tea", 1), "t1", PaymentMethod.CASH, "key-22222222"));
+    }
+
+    @Test
+    void aRepeatedSubmitAndARefusedOrderDoNotUseUpTheLimit() {
+        CustomerOrder earlier = storedOrder();
+        when(orders.findByStudent_UsernameAndIdempotencyKey("amina", "key-12345678")).thenReturn(Optional.of(earlier));
+        for (int i = 0; i < 5; i++) {
+            service.place("amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-12345678");
+        }
+        menuHas(TEA, JUICE);
+        for (int i = 0; i < 5; i++) {
+            assertThrows(OrderException.class,
+                    () -> service.place("amina", lines("tea", 1, "juice", 1), "t1", PaymentMethod.CASH, "key-3333333" + 1));
+        }
+
+        PlacedOrder placed = service.place("amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-44444444");
+        assertNotNull(placed);
+    }
+
+    @Test
+    void aCreditOrderRefusedForLackOfCreditDoesNotUseUpTheLimit() {
+        doThrow(new OrderException("not enough credit")).when(credit).reserve(any());
+        for (int i = 0; i < 5; i++) {
+            assertThrows(OrderException.class,
+                    () -> service.place("amina", lines("tea", 1), "t1", PaymentMethod.CREDIT, "key-5555555" + 1));
+        }
+        org.mockito.Mockito.doNothing().when(credit).reserve(any());
+
+        assertNotNull(service.place("amina", lines("tea", 1), "t1", PaymentMethod.CASH, "key-66666666"));
     }
 
     // ---- credit follows the order ----
