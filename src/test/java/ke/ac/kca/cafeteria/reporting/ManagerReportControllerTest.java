@@ -82,6 +82,27 @@ class ManagerReportControllerTest {
 
     @Test
     @WithMockUser(roles = "MANAGER")
+    void theCreditSectionShowsWhatIsOwedHeldAndTheActivity() throws Exception {
+        ManagerReport withCredit = new ManagerReport("2026-10-22", "2026-10-28", List.of(), 1L,
+                List.of(new ReportLine("Submitted", "status-submitted", 1L, "KSh 130.00")),
+                List.of(new ReportLine("Awaiting payment", "pay-pending", 1L, "KSh 130.00")),
+                List.of(new ReportLine("Cash", "", 0L, "KSh 0.00")), "", "", "", List.of(row()), false, 100,
+                List.of(new ReportLine("Charged to your credit", "credit-post", 2L, "KSh 200.00")),
+                "KSh 175.00", "KSh 45.00");
+        when(reports.build(any(), any(), any(), any(), any())).thenReturn(withCredit);
+
+        mvc.perform(get("/manager/reports"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Student credit")))
+           .andExpect(content().string(containsString("Owed now")))
+           .andExpect(content().string(containsString("KSh 175.00")))
+           .andExpect(content().string(containsString("KSh 45.00")))
+           .andExpect(content().string(containsString("Charged to your credit")))
+           .andExpect(content().string(containsString("Credit activity in these days")));
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
     void aWarningAboutTheRangeIsShown() throws Exception {
         when(reports.build(any(), any(), any(), any(), any())).thenReturn(report(
                 List.of("The start date was after the end date, so the last 7 days are shown."), List.of(row())));

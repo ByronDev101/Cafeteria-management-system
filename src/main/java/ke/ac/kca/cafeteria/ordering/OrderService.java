@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -75,7 +76,10 @@ public class OrderService {
      * Places an order from the cart's lines. If the same duplicate-submit key was already used by this student, the
      * earlier order is returned instead of creating a second one.
      */
-    @Transactional
+    // READ_COMMITTED, not MySQL's default REPEATABLE READ: an order paid with credit locks the student's credit account
+    // and then checks the ledger, and that check must see lines committed while it waited for the lock. See
+    // CreditService.reserve. Do not change this without running CreditConcurrencyIT.
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PlacedOrder place(String username, Map<String, Integer> lines, String tablePublicId,
                              PaymentMethod method, String idempotencyKey) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {

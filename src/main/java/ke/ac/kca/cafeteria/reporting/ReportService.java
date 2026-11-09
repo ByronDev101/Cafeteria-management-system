@@ -1,5 +1,6 @@
 package ke.ac.kca.cafeteria.reporting;
 
+import ke.ac.kca.cafeteria.credit.CreditEntryType;
 import ke.ac.kca.cafeteria.finance.PaymentStatus;
 import ke.ac.kca.cafeteria.finance.PaymentService;
 import ke.ac.kca.cafeteria.finance.PaymentView;
@@ -110,6 +111,33 @@ public class ReportService {
                     PriceParser.format(receivedSums.getOrDefault(method.name(), BigDecimal.ZERO))));
         }
 
+        // ---- student credit (FR-035) ----
+        Map<CreditEntryType, long[]> creditCounts = new EnumMap<>(CreditEntryType.class);
+        Map<CreditEntryType, BigDecimal> creditSums = new EnumMap<>(CreditEntryType.class);
+        for (Object[] row : reports.creditActivity(range.start(), range.endExclusive())) {
+            Optional<CreditEntryType> type = CreditEntryType.parse(String.valueOf(row[0]));
+            if (type.isPresent()) {
+                creditCounts.computeIfAbsent(type.get(), t -> new long[1])[0] += ((Number) row[1]).longValue();
+                creditSums.merge(type.get(), money(row[2]), BigDecimal::add);
+            }
+        }
+        List<ReportLine> creditLines = new ArrayList<>();
+        for (CreditEntryType type : CreditEntryType.values()) {
+            long[] count = creditCounts.get(type);
+            creditLines.add(new ReportLine(type.getLabel(), "credit-" + type.name().toLowerCase(Locale.ROOT),
+                    count == null ? 0L : count[0], PriceParser.format(creditSums.getOrDefault(type, BigDecimal.ZERO))));
+        }
+        Map<CreditEntryType, BigDecimal> allTime = new EnumMap<>(CreditEntryType.class);
+        for (Object[] row : reports.creditTotalsAllTime()) {
+            CreditEntryType.parse(String.valueOf(row[0])).ifPresent(type -> allTime.merge(type, money(row[1]), BigDecimal::add));
+        }
+        BigDecimal owedNow = allTime.getOrDefault(CreditEntryType.POST, BigDecimal.ZERO)
+                .subtract(allTime.getOrDefault(CreditEntryType.REVERSAL, BigDecimal.ZERO))
+                .subtract(allTime.getOrDefault(CreditEntryType.SETTLEMENT, BigDecimal.ZERO)).max(BigDecimal.ZERO);
+        BigDecimal heldNow = allTime.getOrDefault(CreditEntryType.RESERVE, BigDecimal.ZERO)
+                .subtract(allTime.getOrDefault(CreditEntryType.RELEASE, BigDecimal.ZERO))
+                .subtract(allTime.getOrDefault(CreditEntryType.POST, BigDecimal.ZERO)).max(BigDecimal.ZERO);
+
         // ---- search ----
         String chosenStatus = "";
         List<String> statuses = Arrays.stream(OrderStatus.values()).map(Enum::name).toList();
@@ -143,7 +171,8 @@ public class ReportService {
         }
 
         return new ManagerReport(range.getFromText(), range.getToText(), warnings, orderCount, orderLines,
-                paymentLines, methodLines, chosenStatus, number, table, rows, more, SEARCH_LIMIT);
+                paymentLines, methodLines, chosenStatus, number, table, rows, more, SEARCH_LIMIT,
+                creditLines, PriceParser.format(owedNow), PriceParser.format(heldNow));
     }
 
     // ---- helpers ----

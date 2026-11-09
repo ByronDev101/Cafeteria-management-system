@@ -22,6 +22,15 @@ public interface ReportRepository extends Repository<CustomerOrder, Long> {
             + "where p.order.createdAt >= :start and p.order.createdAt < :end group by p.statusCode, p.methodCode")
     List<Object[]> paymentTotals(@Param("start") Instant start, @Param("end") Instant end);
 
+    /** One row per credit ledger line type inside the range: the type, how many lines, and their combined amount. */
+    @Query("select e.entryTypeCode, count(e), sum(e.amount) from CreditEntry e "
+            + "where e.createdAt >= :start and e.createdAt < :end group by e.entryTypeCode")
+    List<Object[]> creditActivity(@Param("start") Instant start, @Param("end") Instant end);
+
+    /** One row per credit ledger line type over all time: the type and the combined amount. Used for what is outstanding. */
+    @Query("select e.entryTypeCode, sum(e.amount) from CreditEntry e group by e.entryTypeCode")
+    List<Object[]> creditTotalsAllTime();
+
     /** Orders in range, newest first. The two text patterns are already lower case with % around them. */
     @Query("select o from CustomerOrder o where o.createdAt >= :start and o.createdAt < :end "
             + "and o.statusCode in :statuses and lower(o.orderNumber) like :number and lower(o.tableLabel) like :table "

@@ -18,11 +18,24 @@ public final class ManagerReport {
     private final List<ReportRow> rows;
     private final boolean moreMatches;
     private final int limit;
+    private final List<ReportLine> creditLines;
+    private final String creditOwedText;
+    private final String creditHeldText;
 
+    /** A report with no credit section (nothing in the ledger). */
     public ManagerReport(String fromText, String toText, List<String> warnings, long orderCount,
                          List<ReportLine> orderLines, List<ReportLine> paymentLines, List<ReportLine> methodLines,
                          String status, String numberText, String tableText, List<ReportRow> rows,
                          boolean moreMatches, int limit) {
+        this(fromText, toText, warnings, orderCount, orderLines, paymentLines, methodLines, status, numberText,
+                tableText, rows, moreMatches, limit, List.of(), "KSh 0.00", "KSh 0.00");
+    }
+
+    public ManagerReport(String fromText, String toText, List<String> warnings, long orderCount,
+                         List<ReportLine> orderLines, List<ReportLine> paymentLines, List<ReportLine> methodLines,
+                         String status, String numberText, String tableText, List<ReportRow> rows,
+                         boolean moreMatches, int limit, List<ReportLine> creditLines, String creditOwedText,
+                         String creditHeldText) {
         this.fromText = fromText;
         this.toText = toText;
         this.warnings = List.copyOf(warnings);
@@ -36,6 +49,9 @@ public final class ManagerReport {
         this.rows = List.copyOf(rows);
         this.moreMatches = moreMatches;
         this.limit = limit;
+        this.creditLines = List.copyOf(creditLines);
+        this.creditOwedText = creditOwedText;
+        this.creditHeldText = creditHeldText;
     }
 
     public String getFromText() {
@@ -94,5 +110,20 @@ public final class ManagerReport {
 
     public int getLimit() {
         return limit;
+    }
+
+    /** One line per credit ledger line type inside the range: how many lines and their combined amount (FR-035). */
+    public List<ReportLine> getCreditLines() {
+        return creditLines;
+    }
+
+    /** What students owe right now across all time: charged and not yet paid. */
+    public String getCreditOwedText() {
+        return creditOwedText;
+    }
+
+    /** What is on hold right now for orders waiting to be accepted. */
+    public String getCreditHeldText() {
+        return creditHeldText;
     }
 }
