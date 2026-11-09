@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -92,6 +93,9 @@ public class CreditService {
         if (!entries.totalsForOrder(order.getId()).isEmpty()) {
             return;     // already held: placing the same order twice must never hold twice
         }
+        // The account row is locked, and the caller (OrderService.place) runs at READ_COMMITTED, so this sum sees every
+        // line committed while we waited for the lock. At REPEATABLE READ it would read an older snapshot and two
+        // simultaneous orders could both pass the limit check.
         CreditBalance balance = balanceFrom(true, account.getCreditLimit(), entries.totalsForStudent(student.getId()));
         BigDecimal total = order.getTotal();
         if (total.compareTo(balance.getAvailable()) > 0) {
@@ -244,8 +248,12 @@ public class CreditService {
                 balanceFrom(true, limit, entries.totalsForStudent(student.getId())));
     }
 
-    /** Records that a student paid some of what they owe. It cannot be more than they owe. Managers only. */
-    @Transactional
+    /**
+     * Records that a student paid some of what they owe. It cannot be more than they owe. Managers only.
+     * READ_COMMITTED for the same reason as placing an order: after waiting for the account lock, what is owed must be
+     * read as it is now.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CreditRow settle(String actor, String studentPublicId, String amountText, String note) {
         ManagerGuard.require();
         AppUser student = activeStudent(studentPublicId);

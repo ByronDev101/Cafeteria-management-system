@@ -165,6 +165,68 @@ class ReportServiceTest {
         assertEquals("KSh 40.00", methods.get(2).getAmountText());
     }
 
+    // ---- student credit (FR-035) ----
+
+    @Test
+    void theCreditSummaryListsEveryLineTypeAndWhatIsOutstandingNow() {
+        when(reports.creditActivity(any(Instant.class), any(Instant.class))).thenReturn(List.<Object[]>of(
+                new Object[] {"RESERVE", 3L, new BigDecimal("300.00")},
+                new Object[] {"POST", 2L, new BigDecimal("200.00")},
+                new Object[] {"SETTLEMENT", 1L, new BigDecimal("50.00")},
+                new Object[] {"NOT_A_TYPE", 9L, new BigDecimal("1.00")}));
+        when(reports.creditTotalsAllTime()).thenReturn(List.<Object[]>of(
+                new Object[] {"RESERVE", new BigDecimal("500.00")},
+                new Object[] {"RELEASE", new BigDecimal("100.00")},
+                new Object[] {"POST", new BigDecimal("300.00")},
+                new Object[] {"REVERSAL", new BigDecimal("20.00")},
+                new Object[] {"SETTLEMENT", new BigDecimal("80.00")}));
+
+        ManagerReport report = buildDefault();
+
+        List<ReportLine> lines = report.getCreditLines();
+        assertEquals(5, lines.size());
+        assertEquals("Held for an order", lines.get(0).getLabel());
+        assertEquals(3L, lines.get(0).getCount());
+        assertEquals("KSh 300.00", lines.get(0).getAmountText());
+        assertEquals("Hold released", lines.get(1).getLabel());
+        assertEquals(0L, lines.get(1).getCount());
+        assertEquals("Charged to your credit", lines.get(2).getLabel());
+        assertEquals("KSh 200.00", lines.get(2).getAmountText());
+        assertEquals("credit-post", lines.get(2).getStyleClass());
+        assertEquals("Payment recorded", lines.get(4).getLabel());
+        assertEquals("KSh 50.00", lines.get(4).getAmountText());
+        // owed: 300 charged - 20 reversed - 80 paid; held: 500 reserved - 100 released - 300 charged
+        assertEquals("KSh 200.00", report.getCreditOwedText());
+        assertEquals("KSh 100.00", report.getCreditHeldText());
+    }
+
+    @Test
+    void withNothingInTheLedgerTheCreditSummaryIsAllZeros() {
+        ManagerReport report = buildDefault();
+
+        assertEquals(5, report.getCreditLines().size());
+        for (ReportLine line : report.getCreditLines()) {
+            assertEquals(0L, line.getCount(), line.getLabel());
+            assertEquals("KSh 0.00", line.getAmountText(), line.getLabel());
+        }
+        assertEquals("KSh 0.00", report.getCreditOwedText());
+        assertEquals("KSh 0.00", report.getCreditHeldText());
+    }
+
+    @Test
+    void whatIsOutstandingIsNeverShownBelowZero() {
+        when(reports.creditTotalsAllTime()).thenReturn(List.<Object[]>of(
+                new Object[] {"POST", new BigDecimal("100.00")},
+                new Object[] {"SETTLEMENT", new BigDecimal("150.00")},
+                new Object[] {"RESERVE", new BigDecimal("50.00")},
+                new Object[] {"POST", new BigDecimal("0.00")}));
+
+        ManagerReport report = buildDefault();
+
+        assertEquals("KSh 0.00", report.getCreditOwedText());
+        assertEquals("KSh 0.00", report.getCreditHeldText());
+    }
+
     // ---- range ----
 
     @Test

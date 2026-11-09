@@ -4,6 +4,7 @@ target/
 .vscode/
 .env
 application-local.properties
+application-it-local.properties
 application-secret*.properties
 *.log
 .DS_Store

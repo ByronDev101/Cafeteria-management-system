@@ -64,6 +64,38 @@
         </div>
     </div>
 
+    <h2 class="h5">Student credit</h2>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card card-body h-100">
+                <span class="report-label">Owed now</span>
+                <span class="report-figure" th:text="${report.creditOwedText}">KSh 0.00</span>
+                <span class="report-count">charged and not yet paid</span>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card card-body h-100">
+                <span class="report-label">Held for orders</span>
+                <span class="report-figure" th:text="${report.creditHeldText}">KSh 0.00</span>
+                <span class="report-count">waiting for staff to accept</span>
+            </div>
+        </div>
+        <section class="col-12 col-md-6" aria-label="Credit activity in the chosen days">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Credit activity in these days</th><th class="text-end">Lines</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                    <tr th:each="c : ${report.creditLines}">
+                        <td th:text="${c.label}">Held for an order</td>
+                        <td class="text-end" th:text="${c.count}">0</td>
+                        <td class="text-end text-nowrap" th:text="${c.amountText}">KSh 0.00</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
     <div class="row g-4 mb-4">
         <section class="col-12 col-lg-6" aria-label="Orders by status">
             <h2 class="h5">Orders by status</h2>
